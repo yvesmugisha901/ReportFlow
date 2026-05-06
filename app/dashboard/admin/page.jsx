@@ -52,7 +52,7 @@ export default function AdminDashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <p className="text-sm text-gray-500 mb-1">Good morning 👋</p>
+                        <p className="text-sm text-gray-500 mb-1">Hey 👋</p>
                         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Admin Dashboard</h1>
                     </div>
                     <div className="flex items-center gap-3">
