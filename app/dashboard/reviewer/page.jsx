@@ -1,40 +1,52 @@
 "use client";
 import { useState } from "react";
+import StatsGrid from "@/components/dashboard/StatsGrid";
+import ReviewQueue from "@/components/dashboard/ReviewQueue";
+import ComplianceBar from "@/components/dashboard/ComplianceBar";
 
-const pendingReports = [
-    { id: 1, name: "Monthly Finance Report", employee: "Alice Uwimana", dept: "Finance", submitted: "May 5, 2026", type: "Monthly", priority: "high" },
-    { id: 2, name: "Weekly Ops Update", employee: "Jean Mugisha", dept: "Finance", submitted: "May 4, 2026", type: "Weekly", priority: "normal" },
-    { id: 3, name: "Budget Variance Report", employee: "Diane Mukamana", dept: "Finance", submitted: "May 3, 2026", type: "Bi-weekly", priority: "high" },
-    { id: 4, name: "Staff Training Summary", employee: "Grace Iradukunda", dept: "Finance", submitted: "May 2, 2026", type: "Monthly", priority: "normal" },
+const pendingItems = [
+    { id: 1, title: "Monthly Finance Report", employee: "Alice Uwimana", department: "Finance", type: "Monthly", submittedAt: "May 5, 2026", priority: "high" },
+    { id: 2, title: "Weekly Ops Update", employee: "Jean Mugisha", department: "Finance", type: "Weekly", submittedAt: "May 4, 2026", priority: "normal" },
+    { id: 3, title: "Budget Variance Report", employee: "Diane Mukamana", department: "Finance", type: "Bi-Weekly", submittedAt: "May 3, 2026", priority: "high" },
+    { id: 4, title: "Staff Training Summary", employee: "Grace Iradukunda", department: "Finance", type: "Monthly", submittedAt: "May 2, 2026", priority: "normal" },
 ];
 
-const reviewed = [
+const deptCompliance = [
+    { name: "Finance — Submission Progress", submitted: 11, total: 14, color: "violet" },
+];
+
+const recentlyReviewed = [
     { name: "Q1 Finance Overview", employee: "Alice Uwimana", action: "Approved", date: "May 1, 2026" },
     { name: "April Expense Report", employee: "Jean Mugisha", action: "Changes Requested", date: "Apr 29, 2026" },
     { name: "Compliance Checklist", employee: "Diane Mukamana", action: "Approved", date: "Apr 28, 2026" },
 ];
 
-const deptProgress = {
-    name: "Finance Department",
-    submitted: 11,
-    total: 14,
-    approved: 8,
-    underReview: 3,
-    pending: 3,
+const ACTION_BADGE = {
+    Approved: "bg-emerald-100 text-emerald-700",
+    "Changes Requested": "bg-amber-100 text-amber-700",
+    Rejected: "bg-rose-100 text-rose-700",
 };
 
 export default function ReviewerDashboard() {
-    const [selected, setSelected] = useState(null);
-    const [comment, setComment] = useState("");
-    const [actionDone, setActionDone] = useState({});
+    // Stats are derived from ReviewQueue's internal done state via onAction callback
+    // We track counts here so the StatsGrid stays reactive
+    const [actionLog, setActionLog] = useState([]);
 
-    const handleAction = (id, action) => {
-        setActionDone((prev) => ({ ...prev, [id]: action }));
-        setSelected(null);
-        setComment("");
-    };
+    const reviewedCount = actionLog.length;
+    const pendingCount = pendingItems.length - reviewedCount;
 
-    const pct = Math.round((deptProgress.submitted / deptProgress.total) * 100);
+    const stats = [
+        { label: "Awaiting Review", value: pendingCount, icon: "⏳", color: "amber" },
+        { label: "Reviewed Today", value: reviewedCount, icon: "✅", color: "emerald" },
+        { label: "Dept. Submitted", value: 11, icon: "📤", color: "indigo" },
+        { label: "Dept. Approved", value: 8, icon: "📊", color: "violet" },
+    ];
+
+    function handleAction(id, action, comment) {
+        setActionLog((prev) => [...prev, { id, action, comment }]);
+        console.log("Reviewer action:", { id, action, comment });
+        // TODO: call your API here → PATCH /api/reports/:id/review
+    }
 
     return (
         <div className="min-h-screen bg-[#f8f9fc] text-[#0f1117]">
@@ -59,147 +71,46 @@ export default function ReviewerDashboard() {
                     </button>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                    {[
-                        { label: "Awaiting Review", value: pendingReports.filter(r => !actionDone[r.id]).length, icon: "⏳", color: "text-amber-600" },
-                        { label: "Reviewed Today", value: Object.keys(actionDone).length, icon: "✅", color: "text-emerald-600" },
-                        { label: "Dept. Submitted", value: deptProgress.submitted, icon: "📤", color: "text-indigo-600" },
-                        { label: "Dept. Approved", value: deptProgress.approved, icon: "📊", color: "text-violet-600" },
-                    ].map((s) => (
-                        <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                            <div className="text-xl mb-2">{s.icon}</div>
-                            <div className={`text-2xl font-extrabold mb-0.5 ${s.color}`}>{s.value}</div>
-                            <div className="text-[11px] text-gray-400 font-medium">{s.label}</div>
-                        </div>
-                    ))}
+                {/* ── StatsGrid ── */}
+                <div className="mb-6">
+                    <StatsGrid stats={stats} cols={4} />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
-                    {/* Pending Review Queue */}
-                    <div className="lg:col-span-2 space-y-4">
-                        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-                                <span className="font-bold text-sm text-gray-800">Pending Review Queue</span>
-                                <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2.5 py-1 rounded-full">
-                                    {pendingReports.filter(r => !actionDone[r.id]).length} pending
-                                </span>
-                            </div>
-                            <div>
-                                {pendingReports.map((r) => (
-                                    <div key={r.id} className={`border-b border-gray-50 last:border-0 transition-all ${actionDone[r.id] ? "opacity-50" : ""}`}>
-                                        <div className="flex items-center justify-between px-5 py-4 hover:bg-gray-50/50">
-                                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                {r.priority === "high" && (
-                                                    <span className="w-2 h-2 bg-rose-500 rounded-full flex-shrink-0" />
-                                                )}
-                                                <div className="min-w-0">
-                                                    <div className="text-sm font-semibold text-gray-800 truncate">{r.name}</div>
-                                                    <div className="text-xs text-gray-400 mt-0.5">
-                                                        {r.employee} · {r.type} · Submitted {r.submitted}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            {actionDone[r.id] ? (
-                                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold ${actionDone[r.id] === "Approved" ? "bg-emerald-100 text-emerald-700" :
-                                                    actionDone[r.id] === "Rejected" ? "bg-red-100 text-red-700" :
-                                                        "bg-amber-100 text-amber-700"
-                                                    }`}>{actionDone[r.id]}</span>
-                                            ) : (
-                                                <button
-                                                    onClick={() => setSelected(selected === r.id ? null : r.id)}
-                                                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg border border-indigo-200 transition-colors flex-shrink-0"
-                                                >
-                                                    Review
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        {/* Inline Review Panel */}
-                                        {selected === r.id && (
-                                            <div className="px-5 pb-4 bg-indigo-50/40 border-t border-indigo-100">
-                                                <p className="text-xs font-semibold text-gray-700 mb-2 pt-3">Add comment (optional)</p>
-                                                <textarea
-                                                    className="w-full border border-gray-200 rounded-xl p-3 text-xs text-gray-700 resize-none focus:outline-none focus:border-indigo-400 bg-white"
-                                                    rows={2}
-                                                    placeholder="Leave a note for the employee..."
-                                                    value={comment}
-                                                    onChange={(e) => setComment(e.target.value)}
-                                                />
-                                                <div className="flex gap-2 mt-3">
-                                                    <button
-                                                        onClick={() => handleAction(r.id, "Approved")}
-                                                        className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors"
-                                                    >
-                                                        ✓ Approve
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAction(r.id, "Changes Requested")}
-                                                        className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-colors"
-                                                    >
-                                                        ✏ Request Changes
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAction(r.id, "Rejected")}
-                                                        className="flex-1 py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition-colors"
-                                                    >
-                                                        ✕ Reject
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
+                    {/* ── ReviewQueue (stage 1) ── */}
+                    <div className="lg:col-span-2">
+                        <ReviewQueue
+                            items={pendingItems}
+                            onAction={handleAction}
+                            stage={1}
+                            title="Pending Review Queue"
+                        />
                     </div>
 
-                    {/* Right Column */}
+                    {/* Right column */}
                     <div className="flex flex-col gap-6">
+                        {/* ── ComplianceBar for this department ── */}
+                        <ComplianceBar
+                            departments={deptCompliance}
+                            title="Finance Department"
+                        />
 
-                        {/* Department Progress */}
-                        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                                <span className="font-bold text-sm text-gray-800">{deptProgress.name}</span>
-                            </div>
-                            <div className="p-5">
-                                <div className="flex justify-between text-xs text-gray-500 mb-2">
-                                    <span>Submission Progress</span>
-                                    <span className="font-bold text-gray-800">{pct}%</span>
-                                </div>
-                                <div className="w-full bg-gray-100 rounded-full h-3 mb-4">
-                                    <div className="bg-violet-500 h-3 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 text-center">
-                                    {[
-                                        { label: "Submitted", val: deptProgress.submitted, color: "text-indigo-600" },
-                                        { label: "Approved", val: deptProgress.approved, color: "text-emerald-600" },
-                                        { label: "Pending", val: deptProgress.pending, color: "text-amber-600" },
-                                    ].map((item) => (
-                                        <div key={item.label} className="bg-gray-50 rounded-xl p-2">
-                                            <div className={`text-lg font-extrabold ${item.color}`}>{item.val}</div>
-                                            <div className="text-[9px] text-gray-400 font-medium">{item.label}</div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Recently Reviewed */}
+                        {/* Recently Reviewed — simple list, no extra component needed */}
                         <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
                             <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
                                 <span className="font-bold text-sm text-gray-800">Recently Reviewed</span>
                             </div>
                             <div className="divide-y divide-gray-50">
-                                {reviewed.map((r) => (
+                                {recentlyReviewed.map((r) => (
                                     <div key={r.name} className="px-5 py-3 flex items-center justify-between">
                                         <div>
                                             <p className="text-xs font-semibold text-gray-800">{r.name}</p>
                                             <p className="text-[10px] text-gray-400">{r.employee} · {r.date}</p>
                                         </div>
-                                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${r.action === "Approved" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                                            }`}>{r.action}</span>
+                                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${ACTION_BADGE[r.action] ?? "bg-gray-100 text-gray-600"}`}>
+                                            {r.action}
+                                        </span>
                                     </div>
                                 ))}
                             </div>

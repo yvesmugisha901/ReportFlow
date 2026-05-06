@@ -1,47 +1,48 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import StatsGrid from "@/components/dashboard/StatsGrid";
+import ReportTable from "@/components/dashboard/ReportTable";
+import ComplianceBar from "@/components/dashboard/ComplianceBar";
 
 const stats = [
-    { label: "Total Reports", value: "248", icon: "📋", change: "+12 this month", up: true },
-    { label: "Pending Review", value: "17", icon: "⏳", change: "5 overdue", up: false },
-    { label: "Approved", value: "198", icon: "✅", change: "+8 this week", up: true },
-    { label: "Departments", value: "6", icon: "🏢", change: "All active", up: true },
-    { label: "Employees", value: "54", icon: "👥", change: "+2 this month", up: true },
-    { label: "Compliance Rate", value: "89%", icon: "📊", change: "-3% vs last month", up: false },
+    { label: "Total Reports", value: "248", icon: "📋", trend: "12 this month", trendUp: true, color: "indigo" },
+    { label: "Pending Review", value: "17", icon: "⏳", trend: "5 overdue", trendUp: false, color: "amber" },
+    { label: "Approved", value: "198", icon: "✅", trend: "8 this week", trendUp: true, color: "emerald" },
+    { label: "Departments", value: "6", icon: "🏢", trend: "All active", trendUp: true, color: "sky" },
+    { label: "Employees", value: "54", icon: "👥", trend: "2 this month", trendUp: true, color: "violet" },
+    { label: "Compliance Rate", value: "89%", icon: "📊", trend: "3% vs last month", trendUp: false, color: "rose" },
 ];
 
 const recentReports = [
-    { name: "Monthly Finance Report", dept: "Finance", employee: "Alice Uwimana", status: "Approved", date: "May 5, 2026" },
-    { name: "Q2 Operations Summary", dept: "Operations", employee: "Jean Mugisha", status: "Under Review", date: "May 4, 2026" },
-    { name: "HR Compliance Report", dept: "Human Resources", employee: "Grace Iradukunda", status: "Pending", date: "May 3, 2026" },
-    { name: "IT Infrastructure Report", dept: "IT", employee: "Eric Nshimiyimana", status: "Changes Requested", date: "May 2, 2026" },
-    { name: "Sales Pipeline Summary", dept: "Sales", employee: "Diane Mukamana", status: "Approved", date: "May 1, 2026" },
+    { id: 1, title: "Monthly Finance Report", employee: "Alice Uwimana", department: "Finance", type: "Monthly", submittedAt: "May 5, 2026", status: "Approved" },
+    { id: 2, title: "Q2 Operations Summary", employee: "Jean Mugisha", department: "Operations", type: "Quarterly", submittedAt: "May 4, 2026", status: "Under Review" },
+    { id: 3, title: "HR Compliance Report", employee: "Grace Iradukunda", department: "Human Resources", type: "Monthly", submittedAt: "May 3, 2026", status: "Pending" },
+    { id: 4, title: "IT Infrastructure Report", employee: "Eric Nshimiyimana", department: "IT", type: "Monthly", submittedAt: "May 2, 2026", status: "Changes Requested" },
+    { id: 5, title: "Sales Pipeline Summary", employee: "Diane Mukamana", department: "Sales", type: "Monthly", submittedAt: "May 1, 2026", status: "Approved" },
 ];
 
 const departments = [
-    { name: "Finance", submitted: 8, total: 10, color: "bg-indigo-500" },
-    { name: "Operations", submitted: 6, total: 8, color: "bg-violet-500" },
-    { name: "Human Resources", submitted: 4, total: 6, color: "bg-sky-500" },
-    { name: "IT", submitted: 7, total: 8, color: "bg-emerald-500" },
-    { name: "Sales", submitted: 5, total: 10, color: "bg-amber-500" },
-    { name: "Legal", submitted: 3, total: 4, color: "bg-rose-500" },
+    { name: "Finance", submitted: 8, total: 10, color: "indigo" },
+    { name: "Operations", submitted: 6, total: 8, color: "violet" },
+    { name: "Human Resources", submitted: 4, total: 6, color: "sky" },
+    { name: "IT", submitted: 7, total: 8, color: "emerald" },
+    { name: "Sales", submitted: 5, total: 10, color: "amber" },
+    { name: "Legal", submitted: 3, total: 4, color: "rose" },
 ];
 
-const statusColor = {
-    Approved: "bg-emerald-100 text-emerald-700",
-    "Under Review": "bg-amber-100 text-amber-700",
-    Pending: "bg-gray-100 text-gray-600",
-    "Changes Requested": "bg-rose-100 text-rose-700",
-    Rejected: "bg-red-100 text-red-700",
-};
+const quickActions = [
+    { label: "Create Department", href: "/dashboard/admin/departments", icon: "🏢", color: "hover:border-indigo-300 hover:bg-indigo-50" },
+    { label: "Add Team", href: "/dashboard/admin/teams", icon: "👥", color: "hover:border-violet-300 hover:bg-violet-50" },
+    { label: "Define Schedule", href: "/dashboard/admin/schedules", icon: "🗓️", color: "hover:border-sky-300 hover:bg-sky-50" },
+    { label: "View All Reports", href: "/dashboard/admin/reports", icon: "📋", color: "hover:border-emerald-300 hover:bg-emerald-50" },
+];
 
 export default function AdminDashboard() {
     const [activeTab, setActiveTab] = useState("overview");
 
     return (
         <div className="min-h-screen bg-[#f8f9fc] text-[#0f1117]">
-            {/* Ambient */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
                 <div className="absolute -top-40 -left-40 w-[500px] h-[500px] rounded-full bg-indigo-100 blur-[120px]" />
                 <div className="absolute bottom-0 right-0 w-[400px] h-[400px] rounded-full bg-violet-100 blur-[100px]" />
@@ -80,9 +81,7 @@ export default function AdminDashboard() {
                         <button
                             key={tab}
                             onClick={() => setActiveTab(tab)}
-                            className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all ${activeTab === tab
-                                ? "bg-indigo-600 text-white shadow-sm"
-                                : "text-gray-500 hover:text-gray-900"
+                            className={`px-4 py-2 rounded-lg text-sm font-medium capitalize transition-all ${activeTab === tab ? "bg-indigo-600 text-white shadow-sm" : "text-gray-500 hover:text-gray-900"
                                 }`}
                         >
                             {tab}
@@ -90,80 +89,28 @@ export default function AdminDashboard() {
                     ))}
                 </div>
 
-                {/* Stats Grid */}
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-                    {stats.map((s) => (
-                        <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                            <div className="text-xl mb-2">{s.icon}</div>
-                            <div className="text-2xl font-extrabold text-gray-900 mb-0.5">{s.value}</div>
-                            <div className="text-[10px] text-gray-400 font-medium mb-1">{s.label}</div>
-                            <div className={`text-[10px] font-semibold ${s.up ? "text-emerald-600" : "text-rose-500"}`}>
-                                {s.up ? "↑" : "↓"} {s.change}
-                            </div>
-                        </div>
-                    ))}
+                {/* ── StatsGrid ── */}
+                <div className="mb-6">
+                    <StatsGrid stats={stats} cols={4} />
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                    {/* Recent Reports */}
-                    <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
-                            <span className="font-bold text-sm text-gray-800">Recent Submissions</span>
-                            <Link href="/dashboard/admin/reports" className="text-xs text-indigo-600 font-semibold hover:underline">
-                                View all →
-                            </Link>
-                        </div>
-                        <div>
-                            {recentReports.map((r) => (
-                                <div key={r.name} className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
-                                    <div className="flex-1 min-w-0 mr-4">
-                                        <div className="text-sm font-semibold text-gray-800 truncate">{r.name}</div>
-                                        <div className="text-xs text-gray-400 mt-0.5">{r.dept} · {r.employee} · {r.date}</div>
-                                    </div>
-                                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold whitespace-nowrap ${statusColor[r.status]}`}>
-                                        {r.status}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
+                    {/* ── ReportTable ── */}
+                    <div className="lg:col-span-2">
+                        <ReportTable
+                            reports={recentReports}
+                            showEmployee={true}
+                            onView={(report) => console.log("View report:", report.id)}
+                        />
                     </div>
 
-                    {/* Department Compliance */}
-                    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                            <span className="font-bold text-sm text-gray-800">Dept. Compliance</span>
-                        </div>
-                        <div className="p-5 space-y-4">
-                            {departments.map((d) => {
-                                const pct = Math.round((d.submitted / d.total) * 100);
-                                return (
-                                    <div key={d.name}>
-                                        <div className="flex justify-between items-center mb-1.5">
-                                            <span className="text-xs font-medium text-gray-700">{d.name}</span>
-                                            <span className="text-xs text-gray-500">{d.submitted}/{d.total}</span>
-                                        </div>
-                                        <div className="w-full bg-gray-100 rounded-full h-2">
-                                            <div
-                                                className={`${d.color} h-2 rounded-full transition-all`}
-                                                style={{ width: `${pct}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
+                    {/* ── ComplianceBar ── */}
+                    <ComplianceBar departments={departments} title="Dept. Compliance" />
                 </div>
 
                 {/* Quick Actions */}
                 <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {[
-                        { label: "Create Department", href: "/dashboard/admin/departments", icon: "🏢", color: "hover:border-indigo-300 hover:bg-indigo-50" },
-                        { label: "Add Team", href: "/dashboard/admin/teams", icon: "👥", color: "hover:border-violet-300 hover:bg-violet-50" },
-                        { label: "Define Schedule", href: "/dashboard/admin/schedules", icon: "🗓️", color: "hover:border-sky-300 hover:bg-sky-50" },
-                        { label: "View All Reports", href: "/dashboard/admin/reports", icon: "📋", color: "hover:border-emerald-300 hover:bg-emerald-50" },
-                    ].map((a) => (
+                    {quickActions.map((a) => (
                         <Link
                             key={a.label}
                             href={a.href}
