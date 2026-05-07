@@ -11,7 +11,7 @@ export default function LoginPage() {
         e.preventDefault();
         setError("");
         setLoading(true);
-        // TODO: wire up to lib/api.js → POST /auth/login
+        // TODO: wire up to lib/api.js → POST /auth/login  
         setTimeout(() => setLoading(false), 1000);
     };
 
