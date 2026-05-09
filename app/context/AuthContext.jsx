@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { loginUser, logoutUser, getMe } from "@/lib/api/auth.api";
+import { loginUser, logoutUser, getMe } from "../lib/api/auth.api";
 
 const AuthContext = createContext(null);
 
@@ -92,13 +92,14 @@ function redirectByRole(role, router) {
         case "employee":
             router.push("/dashboard/employee");
             break;
-        case "department_reviewer":
+        case "reviewer":                          // was "department_reviewer"
             router.push("/dashboard/reviewer");
             break;
-        case "final_approver":
+        case "approver":                          // was "final_approver"
             router.push("/dashboard/approver");
             break;
         default:
-            router.push("/dashboard");
+            console.warn("Unknown role:", role);
+            router.push("/dashboard/employee");
     }
 }

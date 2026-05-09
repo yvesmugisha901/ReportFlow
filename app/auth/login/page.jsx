@@ -1,8 +1,10 @@
 "use client";
 import { useState } from "react";
 import Link from "next/link";
+import { useAuth } from "../../hooks/useAuth";
 
 export default function LoginPage() {
+    const { login } = useAuth();
     const [form, setForm] = useState({ email: "", password: "" });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -11,8 +13,13 @@ export default function LoginPage() {
         e.preventDefault();
         setError("");
         setLoading(true);
-        // TODO: wire up to lib/api.js → POST /auth/login  
-        setTimeout(() => setLoading(false), 1000);
+        try {
+            await login({ email: form.email, password: form.password });
+        } catch (err) {
+            setError(err.response?.data?.error ?? err.response?.data?.message ?? "Invalid email or password");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (

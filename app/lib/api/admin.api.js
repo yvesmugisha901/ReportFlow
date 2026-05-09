@@ -1,11 +1,5 @@
 import api from "@/lib/axios";
 
-/**
- * Admin API
- * Covers FR-01 (departments), FR-02 (teams), FR-03 (employee registration),
- * FR-04 (schedules), FR-12 (admin dashboard analytics)
- */
-
 // ── Departments ──────────────────────────────────────────────
 export const getDepartments = async () => {
     const response = await api.get("/departments");
@@ -50,14 +44,30 @@ export const deleteTeam = async (teamId) => {
 
 // ── Users / Employees ────────────────────────────────────────
 export const getUsers = async (filters = {}) => {
-    const response = await api.get("/users", { params: filters });
+    // Strips out undefined/empty values so the backend doesn't receive blank params
+    const clean = Object.fromEntries(
+        Object.entries(filters).filter(([, v]) => v !== undefined && v !== "")
+    );
+    const response = await api.get("/users", { params: clean });
+    return response.data;
+};
+
+export const getUserById = async (userId) => {
+    const response = await api.get(`/users/${userId}`);
     return response.data;
 };
 
 export const createEmployee = async (userData) => {
-    // Admin registers: { full_name, email, role, dept_id, team_id }
-    const response = await api.post("/users", userData);
-    return response.data;
+    // Backend auto-generates password — only send: full_name, email, role, dept_id, team_id
+    const { full_name, email, role, dept_id, team_id } = userData;
+    const response = await api.post("/users", {
+        full_name,
+        email,
+        role,
+        ...(dept_id && { dept_id }),
+        ...(team_id && { team_id }),
+    });
+    return response.data; // returns { success, user, plainPassword }
 };
 
 export const updateUser = async (userId, data) => {
@@ -70,6 +80,16 @@ export const deactivateUser = async (userId) => {
     return response.data;
 };
 
+export const activateUser = async (userId) => {
+    const response = await api.patch(`/users/${userId}/activate`);
+    return response.data;
+};
+
+export const deleteUser = async (userId) => {
+    const response = await api.delete(`/users/${userId}`);
+    return response.data;
+};
+
 // ── Report Schedules ─────────────────────────────────────────
 export const getSchedules = async () => {
     const response = await api.get("/schedules");
@@ -77,7 +97,6 @@ export const getSchedules = async () => {
 };
 
 export const createSchedule = async (scheduleData) => {
-    // { frequency: 'monthly'|'bi-weekly'|'weekly'|'custom', dept_id, team_id, report_type_id, deadline }
     const response = await api.post("/schedules", scheduleData);
     return response.data;
 };

@@ -1,74 +1,93 @@
 "use client";
-import { useState, useRef } from "react";
+import { useState, useEffect, useRef } from "react";
+import api from "@/lib/axios";
+import { useAuth } from "@/context/AuthContext";
 
 /**
- * ReportForm — modal that slides in when employee clicks "Submit Report".
+ * ReportForm — modal for submitting or resubmitting a report.
  *
  * Props:
- *  prefill?: { reportType: string, department: string, frequency: string }
- *            Passed from ScheduleList when clicking a specific deadline's Submit button.
- *            When null, all fields start empty.
- *  onClose:  () => void   — close the modal
- *  onSubmit: (data) => void — called with form data on submit
- *                            (later: replace with API call inside here)
+ *  prefill?: { reportType, department, frequency }  — pre-fills from a schedule
+ *  onClose:  () => void
+ *  onSubmit: (formData) => Promise<void>            — caller handles the API call
  */
 
-const REPORT_TYPES = [
-    "Monthly Operations Report",
-    "Weekly Progress Update",
-    "Quarterly Review",
-    "Bi-Weekly Summary",
-    "Compliance Report",
-    "Budget Variance Report",
-    "HR Staff Report",
-    "Safety Report",
-    "Other",
-];
+const FREQUENCIES = ["weekly", "bi-weekly", "monthly", "quarterly"];
 
-const DEPARTMENTS = [
-    "Finance",
-    "Operations",
-    "Human Resources",
-    "IT",
-    "Sales",
-    "Legal",
-];
-
-const FREQUENCIES = ["Weekly", "Bi-Weekly", "Monthly", "Quarterly"];
+function capitalize(str) {
+    if (!str) return "";
+    return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, "-");
+}
 
 export default function ReportForm({ prefill = null, onClose, onSubmit }) {
-    const [step, setStep] = useState(1); // 1 = details, 2 = content, 3 = review
+    const { user } = useAuth();
+    const [schedules, setSchedules] = useState([]);
+    const [loadingSchedules, setLoadingSchedules] = useState(true);
+
+    const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [submitError, setSubmitError] = useState("");
     const fileInputRef = useRef(null);
 
     const [form, setForm] = useState({
-        reportType: prefill?.reportType ?? "",
-        department: prefill?.department ?? "",
-        frequency: prefill?.frequency ?? "",
+        schedule_id: "",
+        title: prefill?.reportType ?? "",
+        frequency: prefill?.frequency?.toLowerCase() ?? "",
         periodStart: "",
         periodEnd: "",
-        title: prefill?.reportType ?? "",
         summary: "",
         details: "",
         files: [],
         notes: "",
     });
-
     const [errors, setErrors] = useState({});
+
+    // Fetch real schedules from backend
+    useEffect(() => {
+        const load = async () => {
+            try {
+                const res = await api.get("/schedules");
+                const list = res.data.schedules ?? res.data ?? [];
+                setSchedules(list);
+                // If prefill matches a schedule, pre-select it
+                if (prefill?.frequency) {
+                    const match = list.find(s =>
+                        s.frequency?.toLowerCase() === prefill.frequency?.toLowerCase()
+                    );
+                    if (match) {
+                        setForm(f => ({ ...f, schedule_id: match.schedule_id }));
+                    }
+                }
+            } catch {
+                // schedules optional — user can still submit without selecting one
+            } finally {
+                setLoadingSchedules(false);
+            }
+        };
+        load();
+    }, []);
 
     function set(field, value) {
         setForm((f) => ({ ...f, [field]: value }));
         setErrors((e) => ({ ...e, [field]: undefined }));
+        setSubmitError("");
+    }
+
+    // When a schedule is selected, auto-fill frequency from it
+    function handleScheduleChange(scheduleId) {
+        set("schedule_id", scheduleId);
+        if (scheduleId) {
+            const s = schedules.find(s => String(s.schedule_id) === String(scheduleId));
+            if (s?.frequency) set("frequency", s.frequency);
+        }
     }
 
     function validateStep1() {
         const e = {};
-        if (!form.reportType) e.reportType = "Select a report type";
-        if (!form.department) e.department = "Select a department";
-        if (!form.frequency) e.frequency = "Select a frequency";
         if (!form.periodStart) e.periodStart = "Enter period start date";
         if (!form.periodEnd) e.periodEnd = "Enter period end date";
+        if (!form.frequency) e.frequency = "Select a frequency";
         setErrors(e);
         return Object.keys(e).length === 0;
     }
@@ -98,41 +117,38 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
 
     async function handleSubmit() {
         setSubmitting(true);
-        // Simulate API call — replace with: await fetch("/api/reports", { method: "POST", body: ... })
-        await new Promise((r) => setTimeout(r, 1200));
-        setSubmitting(false);
-        setSubmitted(true);
-        setTimeout(() => {
-            onSubmit?.(form);
-        }, 1500);
+        setSubmitError("");
+        try {
+            await onSubmit(form);
+            setSubmitted(true);
+        } catch (err) {
+            const msg = err?.response?.data?.error ?? "Submission failed. Please try again.";
+            setSubmitError(msg);
+        } finally {
+            setSubmitting(false);
+        }
     }
 
-    // ── Step labels
     const STEPS = ["Details", "Content", "Review & Submit"];
+    const selectedSchedule = schedules.find(s => String(s.schedule_id) === String(form.schedule_id));
 
     return (
-        /* Backdrop */
         <div
             className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
         >
             <div className="w-full max-w-2xl bg-white rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
 
-                {/* ── Header ── */}
+                {/* Header */}
                 <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between shrink-0">
                     <div>
                         <h2 className="text-lg font-extrabold text-[#0f1117]">Submit Report</h2>
                         <p className="text-xs text-gray-400 mt-0.5">Fill in all sections and attach your file</p>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors text-sm"
-                    >
-                        ✕
-                    </button>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors text-sm">✕</button>
                 </div>
 
-                {/* ── Step Indicator ── */}
+                {/* Step Indicator */}
                 <div className="px-6 py-4 border-b border-gray-50 shrink-0">
                     <div className="flex items-center gap-0">
                         {STEPS.map((label, i) => {
@@ -142,15 +158,10 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                             return (
                                 <div key={label} className="flex items-center flex-1 last:flex-none">
                                     <div className="flex flex-col items-center">
-                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${done ? "bg-indigo-600 text-white" :
-                                            active ? "bg-indigo-600 text-white ring-4 ring-indigo-100" :
-                                                "bg-gray-100 text-gray-400"
-                                            }`}>
+                                        <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${done ? "bg-indigo-600 text-white" : active ? "bg-indigo-600 text-white ring-4 ring-indigo-100" : "bg-gray-100 text-gray-400"}`}>
                                             {done ? "✓" : n}
                                         </div>
-                                        <span className={`text-[10px] mt-1 font-medium ${active || done ? "text-indigo-600" : "text-gray-400"}`}>
-                                            {label}
-                                        </span>
+                                        <span className={`text-[10px] mt-1 font-medium ${active || done ? "text-indigo-600" : "text-gray-400"}`}>{label}</span>
                                     </div>
                                     {i < STEPS.length - 1 && (
                                         <div className={`flex-1 h-px mx-2 mb-4 transition-colors ${done ? "bg-indigo-400" : "bg-gray-200"}`} />
@@ -161,10 +172,10 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                     </div>
                 </div>
 
-                {/* ── Form body (scrollable) ── */}
+                {/* Form Body */}
                 <div className="flex-1 overflow-y-auto px-6 py-5">
 
-                    {/* SUCCESS STATE */}
+                    {/* SUCCESS */}
                     {submitted && (
                         <div className="flex flex-col items-center justify-center py-12 text-center">
                             <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-3xl mb-4">✅</div>
@@ -176,27 +187,42 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                     {/* STEP 1 — Details */}
                     {!submitted && step === 1 && (
                         <div className="flex flex-col gap-4">
-                            <Field label="Report Type" error={errors.reportType} required>
-                                <select
-                                    value={form.reportType}
-                                    onChange={(e) => set("reportType", e.target.value)}
-                                    className={inputCls(errors.reportType)}
-                                >
-                                    <option value="">Select type…</option>
-                                    {REPORT_TYPES.map((t) => <option key={t}>{t}</option>)}
-                                </select>
+                            {/* Schedule picker — real data from backend */}
+                            <Field label="Report Schedule" hint="Optional — links to a deadline">
+                                {loadingSchedules ? (
+                                    <div className="text-xs text-gray-400 py-2">Loading schedules…</div>
+                                ) : (
+                                    <select
+                                        value={form.schedule_id}
+                                        onChange={(e) => handleScheduleChange(e.target.value)}
+                                        className={inputCls()}
+                                    >
+                                        <option value="">— No schedule —</option>
+                                        {schedules.map((s) => (
+                                            <option key={s.schedule_id} value={s.schedule_id}>
+                                                {s.title ?? `Schedule #${s.schedule_id}`}
+                                                {s.deadline ? ` — due ${new Date(s.deadline).toLocaleDateString()}` : ""}
+                                                {s.frequency ? ` (${capitalize(s.frequency)})` : ""}
+                                            </option>
+                                        ))}
+                                    </select>
+                                )}
                             </Field>
 
-                            <Field label="Department" error={errors.department} required>
-                                <select
-                                    value={form.department}
-                                    onChange={(e) => set("department", e.target.value)}
-                                    className={inputCls(errors.department)}
-                                >
-                                    <option value="">Select department…</option>
-                                    {DEPARTMENTS.map((d) => <option key={d}>{d}</option>)}
-                                </select>
-                            </Field>
+                            {/* If a schedule is selected, show its linked dept/team */}
+                            {selectedSchedule && (
+                                <div className="bg-indigo-50 rounded-xl px-4 py-3 text-xs text-indigo-700 flex flex-wrap gap-x-4 gap-y-1">
+                                    {selectedSchedule.department?.name && (
+                                        <span>🏢 {selectedSchedule.department.name}</span>
+                                    )}
+                                    {selectedSchedule.team?.name && (
+                                        <span>👥 {selectedSchedule.team.name}</span>
+                                    )}
+                                    {selectedSchedule.deadline && (
+                                        <span>📅 Due {new Date(selectedSchedule.deadline).toLocaleDateString()}</span>
+                                    )}
+                                </div>
+                            )}
 
                             <Field label="Frequency" error={errors.frequency} required>
                                 <div className="flex flex-wrap gap-2">
@@ -205,12 +231,9 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                             key={f}
                                             type="button"
                                             onClick={() => set("frequency", f)}
-                                            className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${form.frequency === f
-                                                ? "bg-indigo-600 text-white border-indigo-600"
-                                                : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
-                                                }`}
+                                            className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${form.frequency === f ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}
                                         >
-                                            {f}
+                                            {capitalize(f)}
                                         </button>
                                     ))}
                                 </div>
@@ -261,7 +284,6 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                 />
                             </Field>
 
-                            {/* File upload */}
                             <Field label="Attachments" hint="PDF, DOCX, XLSX — max 10MB each">
                                 <div
                                     className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors"
@@ -303,9 +325,8 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                 <p className="text-xs font-bold text-indigo-700 uppercase tracking-wide mb-3">Report Summary</p>
                                 <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
                                     {[
-                                        ["Type", form.reportType],
-                                        ["Department", form.department],
-                                        ["Frequency", form.frequency],
+                                        ["Schedule", selectedSchedule?.title ?? "None"],
+                                        ["Frequency", capitalize(form.frequency)],
                                         ["Period", form.periodStart && form.periodEnd ? `${form.periodStart} → ${form.periodEnd}` : "—"],
                                         ["Title", form.title],
                                     ].map(([label, val]) => (
@@ -333,6 +354,12 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                 </div>
                             )}
 
+                            {submitError && (
+                                <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-sm text-rose-600">
+                                    ⚠️ {submitError}
+                                </div>
+                            )}
+
                             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
                                 <span className="text-lg">ℹ️</span>
                                 <p className="text-xs text-amber-700">
@@ -344,7 +371,7 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                     )}
                 </div>
 
-                {/* ── Footer ── */}
+                {/* Footer */}
                 {!submitted && (
                     <div className="px-6 py-4 border-t border-gray-100 flex items-center justify-between shrink-0 bg-gray-50/50">
                         <button
@@ -380,8 +407,6 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
         </div>
     );
 }
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
 
 function inputCls(error) {
     return `w-full border ${error ? "border-rose-400 bg-rose-50" : "border-gray-200"} rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white`;

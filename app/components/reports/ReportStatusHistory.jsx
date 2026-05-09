@@ -2,31 +2,25 @@
 
 /**
  * ReportStatusHistory — vertical timeline of a report's status journey.
- * Shown when employee clicks "View" on a report card/row.
+ *
+ * Accepts either:
+ *  (a) Already-normalized report from EmployeeReportsPage (has history[] already built), OR
+ *  (b) Raw backend report — will normalize on the fly
  *
  * Props:
- *  report: {
- *    id, title, type, department, frequency, dueDate, submittedAt, status,
- *    history: Array<{
- *      status: string,
- *      actor: string,       // "You" | "Eric Nshimiyimana (Reviewer)" | "COO"
- *      role: string,        // "Employee" | "Reviewer" | "Approver"
- *      date: string,
- *      comment?: string,
- *    }>
- *  }
- *  onClose?: () => void     — if rendered inside a modal/drawer
- *  onResubmit?: () => void  — shown when status is "Changes Requested"
+ *  report: normalized report object (from normalizeReport() in EmployeeReportsPage)
+ *  onClose?: () => void
+ *  onResubmit?: () => void
  */
 
 const STEP_META = {
-    "Submitted": { icon: "📤", dot: "bg-indigo-500", line: "bg-indigo-200" },
-    "Under Review": { icon: "🔍", dot: "bg-sky-500", line: "bg-sky-200" },
-    "Changes Requested": { icon: "✏️", dot: "bg-violet-500", line: "bg-violet-200" },
-    "Resubmitted": { icon: "🔄", dot: "bg-indigo-400", line: "bg-indigo-200" },
-    "Stage 1 Approved": { icon: "✅", dot: "bg-emerald-500", line: "bg-emerald-200" },
-    "Approved": { icon: "🎉", dot: "bg-emerald-600", line: "bg-emerald-200" },
-    "Rejected": { icon: "❌", dot: "bg-rose-500", line: "bg-rose-200" },
+    "Submitted": { icon: "📤", dot: "bg-indigo-500" },
+    "Under Review": { icon: "🔍", dot: "bg-sky-500" },
+    "Changes Requested": { icon: "✏️", dot: "bg-violet-500" },
+    "Resubmitted": { icon: "🔄", dot: "bg-indigo-400" },
+    "Stage 1 Approved": { icon: "✅", dot: "bg-emerald-500" },
+    "Approved": { icon: "🎉", dot: "bg-emerald-600" },
+    "Rejected": { icon: "❌", dot: "bg-rose-500" },
 };
 
 const STATUS_BADGE = {
@@ -35,6 +29,12 @@ const STATUS_BADGE = {
     "Approved": "bg-emerald-100 text-emerald-700",
     "Rejected": "bg-rose-100 text-rose-700",
     "Changes Requested": "bg-violet-100 text-violet-700",
+};
+
+const NEXT_STEP_TEXT = {
+    "Pending": { icon: "🔍", text: "Awaiting submission & Stage 1 review" },
+    "Under Review": { icon: "✅", text: "Awaiting reviewer decision (Stage 1)" },
+    "Changes Requested": { icon: "🔄", text: "Waiting for your resubmission" },
 };
 
 export default function ReportStatusHistory({ report, onClose, onResubmit }) {
@@ -49,14 +49,19 @@ export default function ReportStatusHistory({ report, onClose, onResubmit }) {
             <div className="px-6 pt-6 pb-4 border-b border-gray-100 flex items-start justify-between shrink-0">
                 <div className="flex-1 min-w-0 pr-4">
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-1">
-                        {report.department} · {report.type} · {report.frequency}
+                        {[report.department, report.type, report.frequency].filter(Boolean).join(" · ")}
                     </p>
                     <h2 className="text-base font-extrabold text-[#0f1117] leading-snug">{report.title}</h2>
-                    <div className="flex items-center gap-2 mt-2">
+                    <div className="flex items-center gap-2 mt-2 flex-wrap">
                         <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${STATUS_BADGE[report.status] ?? "bg-gray-100 text-gray-600"}`}>
                             {report.status}
                         </span>
-                        <span className="text-xs text-gray-400">Due {report.dueDate}</span>
+                        {report.dueDate && report.dueDate !== "—" && (
+                            <span className="text-xs text-gray-400">Due {report.dueDate}</span>
+                        )}
+                        {report.submittedAt && (
+                            <span className="text-xs text-gray-400">Submitted {report.submittedAt}</span>
+                        )}
                     </div>
                 </div>
                 {onClose && (
@@ -77,23 +82,22 @@ export default function ReportStatusHistory({ report, onClose, onResubmit }) {
                     <p className="text-sm text-gray-400 text-center py-8">No history available yet.</p>
                 ) : (
                     <div className="relative">
-                        {/* vertical connector line */}
+                        {/* vertical connector */}
                         <div className="absolute left-[15px] top-3 bottom-3 w-px bg-gray-100" />
 
                         <ul className="flex flex-col gap-0">
                             {history.map((h, i) => {
-                                const meta = STEP_META[h.status] ?? { icon: "•", dot: "bg-gray-400", line: "bg-gray-200" };
+                                const meta = STEP_META[h.status] ?? { icon: "•", dot: "bg-gray-400" };
                                 const isLast = i === history.length - 1;
+                                const dotBorder = meta.dot.replace("bg-", "border-");
+                                const dotRing = meta.dot.replace("bg-", "ring-");
 
                                 return (
                                     <li key={i} className={`relative flex gap-4 ${isLast ? "pb-0" : "pb-6"}`}>
-                                        {/* dot */}
-                                        <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm bg-white border-2 ${isLast ? `border-current shadow-md ${meta.dot.replace("bg-", "border-")}` : "border-gray-200"
-                                            } ${isLast ? "ring-4 ring-offset-0 " + meta.dot.replace("bg-", "ring-") + "/20" : ""}`}>
+                                        <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm bg-white border-2 ${isLast ? `${dotBorder} shadow-md ring-4 ${dotRing}/20` : "border-gray-200"}`}>
                                             {meta.icon}
                                         </div>
 
-                                        {/* content */}
                                         <div className="flex-1 pt-0.5 pb-1">
                                             <div className="flex items-center justify-between gap-2">
                                                 <span className={`text-sm font-bold ${isLast ? "text-[#0f1117]" : "text-gray-600"}`}>
@@ -118,21 +122,15 @@ export default function ReportStatusHistory({ report, onClose, onResubmit }) {
                     </div>
                 )}
 
-                {/* Pending step — what comes next */}
-                {report.status !== "Approved" && report.status !== "Rejected" && (
+                {/* What happens next */}
+                {NEXT_STEP_TEXT[report.status] && (
                     <div className="mt-4 border-t border-dashed border-gray-200 pt-4">
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-3">What happens next</p>
                         <div className="flex items-center gap-3 opacity-50">
                             <div className="w-8 h-8 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-sm shrink-0">
-                                {report.status === "Under Review" ? "✅" : report.status === "Changes Requested" ? "🔄" : "🔍"}
+                                {NEXT_STEP_TEXT[report.status].icon}
                             </div>
-                            <p className="text-xs text-gray-500">
-                                {report.status === "Under Review"
-                                    ? "Awaiting reviewer decision (Stage 1)"
-                                    : report.status === "Changes Requested"
-                                        ? "Waiting for your resubmission"
-                                        : "Submitted — waiting for Stage 1 review"}
-                            </p>
+                            <p className="text-xs text-gray-500">{NEXT_STEP_TEXT[report.status].text}</p>
                         </div>
                     </div>
                 )}

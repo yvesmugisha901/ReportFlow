@@ -1,7 +1,7 @@
 "use client";
 
-import { AuthProvider } from "@/context/AuthContext";
-import { NotificationsProvider } from "@/context/NotificationsContext";
+import { AuthProvider } from "./AuthContext";
+import { NotificationsProvider } from "./NotificationsContext";
 
 /**
  * Providers — wrap your app/layout.jsx with this component.

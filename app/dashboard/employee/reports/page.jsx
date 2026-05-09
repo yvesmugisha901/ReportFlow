@@ -1,128 +1,181 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
 import ReportCard from "@/components/reports/ReportCard";
 import ReportForm from "@/components/reports/ReportForm";
 import ReportStatusHistory from "@/components/reports/ReportStatusHistory";
 import ReportTable from "@/components/dashboard/ReportTable";
+import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/axios";
 
-// ─── Sample data (replace with API fetch) ──────────────────────────────────────
+// ── Status normalizer: backend snake_case → UI Title Case ─────────────────────
+const STATUS_MAP = {
+    pending: "Pending",
+    submitted: "Pending",         // treat submitted-but-not-yet-reviewed as Pending
+    under_review: "Under Review",
+    changes_requested: "Changes Requested",
+    approved: "Approved",
+    rejected: "Rejected",
+};
 
-const myReports = [
-    {
-        id: 1,
-        title: "Monthly Operations Report",
-        type: "Operations",
-        department: "Operations",
-        frequency: "Monthly",
-        dueDate: "May 10, 2026",
-        submittedAt: null,
-        status: "Pending",
-        reviewerComment: null,
-        history: [],
-    },
-    {
-        id: 2,
-        title: "Q1 Team Performance",
-        type: "Performance",
-        department: "Operations",
-        frequency: "Quarterly",
-        dueDate: "May 5, 2026",
-        submittedAt: "Apr 30, 2026",
-        status: "Approved",
-        reviewerComment: null,
-        history: [
-            { status: "Submitted", actor: "You", role: "Employee", date: "Apr 30, 2026", comment: null },
-            { status: "Under Review", actor: "Eric Nshimiyimana", role: "Reviewer", date: "May 1, 2026", comment: null },
-            { status: "Stage 1 Approved", actor: "Eric Nshimiyimana", role: "Reviewer", date: "May 2, 2026", comment: "Well documented, approved for final review." },
-            { status: "Approved", actor: "COO", role: "Approver", date: "May 3, 2026", comment: "Good work this quarter." },
-        ],
-    },
-    {
-        id: 3,
-        title: "Weekly Progress Update",
-        type: "Progress",
-        department: "Operations",
-        frequency: "Weekly",
-        dueDate: "May 3, 2026",
-        submittedAt: "May 3, 2026",
-        status: "Under Review",
-        reviewerComment: null,
-        history: [
-            { status: "Submitted", actor: "You", role: "Employee", date: "May 3, 2026", comment: null },
-            { status: "Under Review", actor: "Eric Nshimiyimana", role: "Reviewer", date: "May 4, 2026", comment: null },
-        ],
-    },
-    {
-        id: 4,
-        title: "March Summary Report",
-        type: "Summary",
-        department: "Operations",
-        frequency: "Monthly",
-        dueDate: "Apr 5, 2026",
-        submittedAt: "Apr 4, 2026",
-        status: "Changes Requested",
-        reviewerComment: "Please add the budget breakdown for section 3 and resubmit.",
-        history: [
-            { status: "Submitted", actor: "You", role: "Employee", date: "Apr 4, 2026", comment: null },
-            { status: "Under Review", actor: "Eric Nshimiyimana", role: "Reviewer", date: "Apr 5, 2026", comment: null },
-            { status: "Changes Requested", actor: "Eric Nshimiyimana", role: "Reviewer", date: "Apr 6, 2026", comment: "Please add the budget breakdown for section 3 and resubmit." },
-        ],
-    },
-    {
-        id: 5,
-        title: "Safety Compliance Report",
-        type: "Compliance",
-        department: "Operations",
-        frequency: "Bi-Weekly",
-        dueDate: "Apr 20, 2026",
-        submittedAt: "Apr 19, 2026",
-        status: "Approved",
-        reviewerComment: null,
-        history: [
-            { status: "Submitted", actor: "You", role: "Employee", date: "Apr 19, 2026", comment: null },
-            { status: "Under Review", actor: "Eric Nshimiyimana", role: "Reviewer", date: "Apr 20, 2026", comment: null },
-            { status: "Stage 1 Approved", actor: "Eric Nshimiyimana", role: "Reviewer", date: "Apr 21, 2026", comment: "All good." },
-            { status: "Approved", actor: "COO", role: "Approver", date: "Apr 22, 2026", comment: null },
-        ],
-    },
-];
+const REVIEW_LOG_STATUS_MAP = {
+    submitted: "Submitted",
+    under_review: "Under Review",
+    changes_requested: "Changes Requested",
+    approved: "Stage 1 Approved",
+    rejected: "Rejected",
+    resubmitted: "Resubmitted",
+    final_approved: "Approved",
+};
 
-// ─── For ReportTable (needs flat shape) ───────────────────────────────────────
-const tableReports = myReports.map((r) => ({
-    id: r.id,
-    title: r.title,
-    employee: "Me",
-    department: r.department,
-    type: r.type,
-    submittedAt: r.submittedAt ?? "—",
-    status: r.status,
-}));
+/** Convert a raw backend report → shape the UI components expect */
+function normalizeReport(r) {
+    const uiStatus = STATUS_MAP[r.status] ?? "Pending";
+
+    // Build history from reviewLogs
+    const history = (r.reviewLogs ?? []).map((log) => ({
+        status: REVIEW_LOG_STATUS_MAP[log.action] ?? log.action,
+        actor: log.reviewer?.full_name ?? "System",
+        role: log.reviewer?.role ?? "",
+        date: log.createdAt ? new Date(log.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—",
+        comment: log.comment ?? null,
+    }));
+
+    // Prepend an initial "Submitted" entry if there are logs but none marked submitted
+    if (r.submitted_at && history.length > 0 && history[0].status !== "Submitted") {
+        history.unshift({
+            status: "Submitted",
+            actor: "You",
+            role: "Employee",
+            date: new Date(r.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            comment: null,
+        });
+    }
+
+    // Last reviewer comment (for Changes Requested / Rejected card snippet)
+    const lastLog = r.reviewLogs?.slice(-1)[0];
+    const reviewerComment = lastLog?.comment ?? null;
+
+    return {
+        id: r.report_id,
+        title: r.title,
+        type: r.schedule?.title ?? r.report_type ?? "Report",
+        department: r.employee?.department?.name ?? r.department?.name ?? "—",
+        frequency: capitalize(r.schedule?.frequency ?? r.frequency ?? ""),
+        dueDate: r.schedule?.deadline
+            ? new Date(r.schedule.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            : "—",
+        submittedAt: r.submitted_at
+            ? new Date(r.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            : null,
+        status: uiStatus,
+        reviewerComment,
+        history,
+        // keep raw id for API calls
+        _raw: r,
+    };
+}
+
+function capitalize(str) {
+    if (!str) return "";
+    return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, "-");
+}
 
 const ALL_STATUSES = ["All", "Pending", "Under Review", "Approved", "Changes Requested", "Rejected"];
 
 // ─── Component ────────────────────────────────────────────────────────────────
-
 export default function EmployeeReportsPage() {
-    const [view, setView] = useState("grid");   // "grid" | "table"
+    const { user } = useAuth();
+    const [reports, setReports] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+
+    const [view, setView] = useState("grid");
     const [statusFilter, setStatus] = useState("All");
     const [showForm, setShowForm] = useState(false);
-    const [selectedReport, setSelected] = useState(null);     // for status history modal
-    const [resubmitReport, setResubmit] = useState(null);     // for resubmit → opens form
+    const [selectedReport, setSelected] = useState(null);
+    const [resubmitReport, setResubmit] = useState(null);
 
-    const filtered = myReports.filter(
+    const load = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const res = await api.get("/reports");
+            const raw = res.data.reports ?? res.data ?? [];
+            setReports(raw.map(normalizeReport));
+        } catch {
+            setError("Failed to load your reports.");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    const filtered = reports.filter(
         (r) => statusFilter === "All" || r.status === statusFilter
     );
 
     const counts = ALL_STATUSES.slice(1).reduce((acc, s) => {
-        acc[s] = myReports.filter((r) => r.status === s).length;
+        acc[s] = reports.filter((r) => r.status === s).length;
         return acc;
     }, {});
+
+    // Table-compatible flat shape
+    const tableReports = filtered.map((r) => ({
+        id: r.id,
+        title: r.title,
+        employee: user?.full_name ?? "Me",
+        department: r.department,
+        type: r.type,
+        submittedAt: r.submittedAt ?? "—",
+        status: r.status,
+    }));
 
     function handleResubmit(report) {
         setSelected(null);
         setResubmit(report);
         setShowForm(true);
     }
+
+    async function handleFormSubmit(formData) {
+        try {
+            if (resubmitReport) {
+                // Resubmit existing report
+                await api.patch(`/reports/${resubmitReport.id}/submit`, {
+                    title: formData.title,
+                    content: formData.details,
+                    summary: formData.summary,
+                    notes: formData.notes,
+                    period_start: formData.periodStart,
+                    period_end: formData.periodEnd,
+                });
+            } else {
+                // Create new report then submit it
+                const createRes = await api.post("/reports", {
+                    title: formData.title,
+                    content: formData.details,
+                    summary: formData.summary,
+                    notes: formData.notes,
+                    period_start: formData.periodStart,
+                    period_end: formData.periodEnd,
+                    schedule_id: formData.schedule_id ?? null,
+                });
+                const newId = createRes.data.report?.report_id;
+                if (newId) {
+                    await api.patch(`/reports/${newId}/submit`);
+                }
+            }
+            setShowForm(false);
+            setResubmit(null);
+            load(); // refresh list
+        } catch (err) {
+            console.error("Submit failed:", err);
+            // let ReportForm handle its own error display — re-throw so it can catch
+            throw err;
+        }
+    }
+
+    const deptName = user?.department?.name ?? user?.dept_name ?? "Your Department";
 
     return (
         <div className="min-h-screen bg-[#f8f9fc] text-[#0f1117]">
@@ -137,7 +190,7 @@ export default function EmployeeReportsPage() {
                 {/* ── Page Header ── */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <p className="text-sm text-gray-500 mb-1">Operations Department</p>
+                        <p className="text-sm text-gray-500 mb-1">{deptName}</p>
                         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">My Reports</h1>
                     </div>
                     <button
@@ -151,95 +204,94 @@ export default function EmployeeReportsPage() {
                     </button>
                 </div>
 
-                {/* ── Status Summary Pills ── */}
-                <div className="flex flex-wrap gap-2 mb-6">
-                    <button
-                        onClick={() => setStatus("All")}
-                        className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === "All"
-                            ? "bg-indigo-600 text-white"
-                            : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"
-                            }`}
-                    >
-                        All ({myReports.length})
-                    </button>
-                    {Object.entries(counts).map(([status, count]) => (
-                        <button
-                            key={status}
-                            onClick={() => setStatus(status)}
-                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === status
-                                ? "bg-indigo-600 text-white"
-                                : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"
-                                }`}
-                        >
-                            {status} ({count})
-                        </button>
-                    ))}
-                </div>
-
-                {/* ── Toolbar: view toggle ── */}
-                <div className="flex items-center justify-between mb-4">
-                    <p className="text-xs text-gray-400">{filtered.length} report{filtered.length !== 1 ? "s" : ""}</p>
-                    <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
-                        <button
-                            onClick={() => setView("grid")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "grid" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-900"
-                                }`}
-                        >
-                            ⊞ Grid
-                        </button>
-                        <button
-                            onClick={() => setView("table")}
-                            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "table" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-900"
-                                }`}
-                        >
-                            ☰ Table
-                        </button>
+                {/* ── Loading / Error states ── */}
+                {loading ? (
+                    <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
+                ) : error ? (
+                    <div className="text-center py-16">
+                        <p className="text-red-500 mb-3">{error}</p>
+                        <button onClick={load} className="text-sm text-indigo-600 hover:underline">Retry</button>
                     </div>
-                </div>
-
-                {/* ── Grid View ── */}
-                {view === "grid" && (
+                ) : (
                     <>
-                        {filtered.length === 0 ? (
-                            <div className="text-center py-20 text-gray-400">
-                                <div className="text-4xl mb-3">📭</div>
-                                <p className="font-medium">No reports with this status</p>
+                        {/* ── Status Filter Pills ── */}
+                        <div className="flex flex-wrap gap-2 mb-6">
+                            <button
+                                onClick={() => setStatus("All")}
+                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === "All"
+                                    ? "bg-indigo-600 text-white"
+                                    : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"}`}
+                            >
+                                All ({reports.length})
+                            </button>
+                            {Object.entries(counts).map(([status, count]) => (
+                                <button
+                                    key={status}
+                                    onClick={() => setStatus(status)}
+                                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === status
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"}`}
+                                >
+                                    {status} ({count})
+                                </button>
+                            ))}
+                        </div>
+
+                        {/* ── Toolbar ── */}
+                        <div className="flex items-center justify-between mb-4">
+                            <p className="text-xs text-gray-400">{filtered.length} report{filtered.length !== 1 ? "s" : ""}</p>
+                            <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
+                                <button
+                                    onClick={() => setView("grid")}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "grid" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-900"}`}
+                                >
+                                    ⊞ Grid
+                                </button>
+                                <button
+                                    onClick={() => setView("table")}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "table" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-900"}`}
+                                >
+                                    ☰ Table
+                                </button>
                             </div>
-                        ) : (
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                {filtered.map((report) => (
-                                    <ReportCard
-                                        key={report.id}
-                                        report={report}
-                                        onClick={setSelected}
-                                    />
-                                ))}
-                            </div>
+                        </div>
+
+                        {/* ── Grid View ── */}
+                        {view === "grid" && (
+                            filtered.length === 0 ? (
+                                <div className="text-center py-20 text-gray-400">
+                                    <div className="text-4xl mb-3">📭</div>
+                                    <p className="font-medium">No reports with this status</p>
+                                </div>
+                            ) : (
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {filtered.map((report) => (
+                                        <ReportCard key={report.id} report={report} onClick={setSelected} />
+                                    ))}
+                                </div>
+                            )
+                        )}
+
+                        {/* ── Table View ── */}
+                        {view === "table" && (
+                            <ReportTable
+                                reports={tableReports}
+                                showEmployee={false}
+                                onView={(r) => setSelected(reports.find((m) => m.id === r.id))}
+                            />
                         )}
                     </>
                 )}
-
-                {/* ── Table View — uses shared ReportTable component ── */}
-                {view === "table" && (
-                    <ReportTable
-                        reports={tableReports.filter((r) => statusFilter === "All" || r.status === statusFilter)}
-                        showEmployee={false}
-                        onView={(r) => setSelected(myReports.find((m) => m.id === r.id))}
-                    />
-                )}
             </div>
 
-            {/* ── ReportForm Modal (new submission or resubmit) ── */}
+            {/* ── ReportForm Modal ── */}
             {showForm && (
                 <ReportForm
-                    prefill={resubmitReport ? { reportType: resubmitReport.title, department: resubmitReport.department, frequency: resubmitReport.frequency } : null}
+                    prefill={resubmitReport
+                        ? { reportType: resubmitReport.type, department: resubmitReport.department, frequency: resubmitReport.frequency }
+                        : null}
                     onClose={() => { setShowForm(false); setResubmit(null); }}
-                    onSubmit={(data) => {
-                        console.log("Submitted:", data);
-                        // TODO: POST /api/reports  or PATCH /api/reports/:id/resubmit
-                        setShowForm(false);
-                        setResubmit(null);
-                    }}
+                    onSubmit={handleFormSubmit}
                 />
             )}
 
