@@ -74,16 +74,14 @@ export const updateUser = async (userId, data) => {
 };
 
 // ── Pending approvals ────────────────────────────────────────
-// GET /api/users/pending → all users with is_active=false
 export const getPendingUsers = async () => {
     const response = await api.get("/users/pending");
-    return response.data; // { success, count, users }
+    return response.data;
 };
 
-// PATCH /api/users/:id/approve → sets is_active=true, assigns team_id
 export const approveUser = async (userId, { team_id } = {}) => {
     const response = await api.patch(`/users/${userId}/approve`, { team_id: team_id || null });
-    return response.data; // { success, message, user }
+    return response.data;
 };
 
 // ── Status toggles ───────────────────────────────────────────
@@ -124,8 +122,16 @@ export const deleteSchedule = async (scheduleId) => {
 };
 
 // ── Dashboard Analytics ───────────────────────────────────────
+
+// Admin only — do NOT call from approver or reviewer dashboards
 export const getAdminDashboardStats = async () => {
     const response = await api.get("/dashboard/admin");
+    return response.data;
+};
+
+// Approver (COO) dashboard — hits /api/dashboard/approver
+export const getApproverDashboardStats = async () => {
+    const response = await api.get("/dashboard/approver");
     return response.data;
 };
 
