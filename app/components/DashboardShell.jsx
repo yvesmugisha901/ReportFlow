@@ -39,7 +39,7 @@ function getInitials(name) {
 }
 
 export default function DashboardShell({ children }) {
-    const { user, logout } = useAuth();
+    const { user, logout, refreshUser } = useAuth();
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -47,6 +47,18 @@ export default function DashboardShell({ children }) {
 
     const role = user?.role ?? "employee";
     const navItems = NAV[role] ?? NAV.employee;
+
+    // ── Stale-cache guard ──────────────────────────────────────────────────────
+    // If the URL segment (/dashboard/approver) doesn't match the stored role,
+    // pull fresh user data from /api/auth/me so the sidebar shows the right portal.
+    useEffect(() => {
+        if (!user) return;
+        const urlRole = pathname.split("/")[2]; // "admin" | "approver" | "reviewer" | "employee"
+        if (urlRole && urlRole !== user.role) {
+            refreshUser();
+        }
+    }, [user, pathname, refreshUser]);
+    // ──────────────────────────────────────────────────────────────────────────
 
     // Poll pending count every 60s for admin
     useEffect(() => {
