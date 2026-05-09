@@ -44,7 +44,6 @@ export const deleteTeam = async (teamId) => {
 
 // ── Users / Employees ────────────────────────────────────────
 export const getUsers = async (filters = {}) => {
-    // Strips out undefined/empty values so the backend doesn't receive blank params
     const clean = Object.fromEntries(
         Object.entries(filters).filter(([, v]) => v !== undefined && v !== "")
     );
@@ -58,7 +57,6 @@ export const getUserById = async (userId) => {
 };
 
 export const createEmployee = async (userData) => {
-    // Backend auto-generates password — only send: full_name, email, role, dept_id, team_id
     const { full_name, email, role, dept_id, team_id } = userData;
     const response = await api.post("/users", {
         full_name,
@@ -67,7 +65,7 @@ export const createEmployee = async (userData) => {
         ...(dept_id && { dept_id }),
         ...(team_id && { team_id }),
     });
-    return response.data; // returns { success, user, plainPassword }
+    return response.data;
 };
 
 export const updateUser = async (userId, data) => {
@@ -75,6 +73,20 @@ export const updateUser = async (userId, data) => {
     return response.data;
 };
 
+// ── Pending approvals ────────────────────────────────────────
+// GET /api/users/pending → all users with is_active=false
+export const getPendingUsers = async () => {
+    const response = await api.get("/users/pending");
+    return response.data; // { success, count, users }
+};
+
+// PATCH /api/users/:id/approve → sets is_active=true, assigns team_id
+export const approveUser = async (userId, { team_id } = {}) => {
+    const response = await api.patch(`/users/${userId}/approve`, { team_id: team_id || null });
+    return response.data; // { success, message, user }
+};
+
+// ── Status toggles ───────────────────────────────────────────
 export const deactivateUser = async (userId) => {
     const response = await api.patch(`/users/${userId}/deactivate`);
     return response.data;

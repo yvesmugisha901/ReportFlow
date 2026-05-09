@@ -1,13 +1,18 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import StatsGrid from "@/components/dashboard/StatsGrid";
 import ReportTable from "@/components/dashboard/ReportTable";
 import ComplianceBar from "@/components/dashboard/ComplianceBar";
 import { useAuth } from "@/context/AuthContext";
-import { getAdminDashboardStats } from "@/lib/api/admin.api";
+import {
+    getAdminDashboardStats,
+    getPendingUsers,
+    approveUser,
+    getTeams,
+} from "@/lib/api/admin.api";
 
-// ── Status normalizer for backend snake_case → UI Title Case ──────────────────
+// ── Status normalizer ─────────────────────────────────────────
 const STATUS_LABEL = {
     pending: "Pending",
     submitted: "Pending",
@@ -36,12 +41,171 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, "-");
 }
 
+function timeAgo(dateStr) {
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+}
+
+// ── Approve Modal ─────────────────────────────────────────────
+function ApproveModal({ user, onClose, onApproved }) {
+    const [teams, setTeams] = useState([]);
+    const [teamId, setTeamId] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [teamsLoading, setTeamsLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const load = async () => {
+            setTeamsLoading(true);
+            try {
+                const data = await getTeams(user.dept_id);
+                setTeams(data.teams ?? data.data ?? data ?? []);
+            } catch {
+                setTeams([]);
+            } finally {
+                setTeamsLoading(false);
+            }
+        };
+        if (user.dept_id) load();
+        else setTeamsLoading(false);
+    }, [user.dept_id]);
+
+    const handleApprove = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            await approveUser(user.user_id, { team_id: teamId || null });
+            onApproved(user.user_id);
+            onClose();
+        } catch (err) {
+            setError(err?.response?.data?.error || "Approval failed. Please try again.");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            {/* Backdrop */}
+            <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+
+            {/* Modal */}
+            <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-md p-6">
+                {/* Header */}
+                <div className="flex items-center justify-between mb-5">
+                    <h3 className="text-base font-bold text-gray-900">Approve Employee</h3>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Employee info */}
+                <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-xl border border-gray-200 mb-5">
+                    <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700 text-sm font-bold flex-shrink-0">
+                        {(user.full_name ?? "U").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{user.full_name}</p>
+                        <p className="text-xs text-gray-400 truncate">{user.email}</p>
+                    </div>
+                    {user.department && (
+                        <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-1 rounded-lg flex-shrink-0">
+                            {user.department.name}
+                        </span>
+                    )}
+                </div>
+
+                {/* Team picker */}
+                <div className="mb-5">
+                    <label className="block text-xs font-semibold text-gray-700 mb-1.5">
+                        Assign to team <span className="font-normal text-gray-400">(optional)</span>
+                    </label>
+                    {teamsLoading ? (
+                        <div className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-400">
+                            Loading teams…
+                        </div>
+                    ) : teams.length === 0 ? (
+                        <div className="w-full px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-600">
+                            {user.dept_id
+                                ? "No teams in this department yet — you can assign later."
+                                : "No department selected — you can assign a team later."}
+                        </div>
+                    ) : (
+                        <select
+                            value={teamId}
+                            onChange={(e) => setTeamId(e.target.value)}
+                            className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-900 focus:outline-none focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-100 transition-all appearance-none cursor-pointer"
+                        >
+                            <option value="">No team (assign later)</option>
+                            {teams.map((t) => (
+                                <option key={t.team_id} value={t.team_id}>
+                                    {t.name}
+                                </option>
+                            ))}
+                        </select>
+                    )}
+                </div>
+
+                {error && (
+                    <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-600 font-medium">
+                        {error}
+                    </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex gap-3">
+                    <button
+                        onClick={onClose}
+                        className="flex-1 py-2.5 bg-white hover:bg-gray-50 text-gray-600 text-sm font-medium rounded-xl border border-gray-200 transition-all"
+                    >
+                        Cancel
+                    </button>
+                    <button
+                        onClick={handleApprove}
+                        disabled={loading}
+                        className="flex-1 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-emerald-200 flex items-center justify-center gap-2"
+                    >
+                        {loading ? (
+                            <>
+                                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                </svg>
+                                Approving…
+                            </>
+                        ) : (
+                            <>✓ Approve & Activate</>
+                        )}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Main Dashboard ────────────────────────────────────────────
 export default function AdminDashboard() {
     const { user } = useAuth();
     const [dashData, setDashData] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
+    // Pending users state
+    const [pendingUsers, setPendingUsers] = useState([]);
+    const [pendingLoading, setPendingLoading] = useState(true);
+    const [selectedUser, setSelectedUser] = useState(null);
+    const [toast, setToast] = useState("");
+
+    // Load dashboard stats
     useEffect(() => {
         const load = async () => {
             try {
@@ -57,7 +221,30 @@ export default function AdminDashboard() {
         load();
     }, []);
 
-    // Build stats array from real data
+    // Load pending users
+    const loadPending = useCallback(async () => {
+        setPendingLoading(true);
+        try {
+            const data = await getPendingUsers();
+            setPendingUsers(data.users ?? []);
+        } catch {
+            setPendingUsers([]);
+        } finally {
+            setPendingLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { loadPending(); }, [loadPending]);
+
+    const handleApproved = (userId) => {
+        setPendingUsers(prev => prev.filter(u => u.user_id !== userId));
+        setToast("Employee approved and activated!");
+        setTimeout(() => setToast(""), 4000);
+        // Refresh dashboard stats to update employee count
+        getAdminDashboardStats().then(setDashData).catch(() => { });
+    };
+
+    // Build stats
     const stats = dashData ? [
         {
             label: "Total Reports",
@@ -111,10 +298,7 @@ export default function AdminDashboard() {
         },
     ] : [];
 
-    // Recent reports from backend
     const recentReports = (dashData?.recentReports ?? []).map(normalizeReport);
-
-    // Department compliance breakdown
     const deptCompliance = (dashData?.departmentBreakdown ?? []).map((d, i) => ({
         name: d.name ?? d.dept_name ?? `Dept ${i + 1}`,
         submitted: d.submittedCount ?? d.submitted ?? 0,
@@ -151,7 +335,6 @@ export default function AdminDashboard() {
                     </Link>
                 </div>
 
-                {/* Loading / Error */}
                 {loading ? (
                     <div className="flex items-center justify-center h-64 text-gray-400">Loading dashboard…</div>
                 ) : error ? (
@@ -188,6 +371,81 @@ export default function AdminDashboard() {
                             ))}
                         </div>
 
+                        {/* ── Pending Approvals ───────────────────────────────── */}
+                        <div className="mb-6">
+                            <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                                {/* Header */}
+                                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+                                    <div className="flex items-center gap-2.5">
+                                        <span className="text-base">⏳</span>
+                                        <h2 className="text-sm font-bold text-gray-900">Pending Approvals</h2>
+                                        {pendingUsers.length > 0 && (
+                                            <span className="inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 bg-rose-500 text-white text-[10px] font-bold rounded-full">
+                                                {pendingUsers.length}
+                                            </span>
+                                        )}
+                                    </div>
+                                    <button
+                                        onClick={loadPending}
+                                        className="text-xs text-gray-400 hover:text-indigo-600 transition-colors"
+                                    >
+                                        Refresh
+                                    </button>
+                                </div>
+
+                                {/* Body */}
+                                {pendingLoading ? (
+                                    <div className="px-5 py-8 text-center text-sm text-gray-400">Loading…</div>
+                                ) : pendingUsers.length === 0 ? (
+                                    <div className="px-5 py-8 text-center">
+                                        <div className="text-2xl mb-2">✅</div>
+                                        <p className="text-sm text-gray-400">No pending approvals — all caught up!</p>
+                                    </div>
+                                ) : (
+                                    <div className="divide-y divide-gray-100">
+                                        {pendingUsers.map((u) => (
+                                            <div key={u.user_id} className="flex items-center gap-4 px-5 py-3.5 hover:bg-gray-50 transition-colors">
+                                                {/* Avatar */}
+                                                <div className="w-9 h-9 rounded-xl bg-indigo-50 flex items-center justify-center text-indigo-700 text-xs font-bold flex-shrink-0">
+                                                    {(u.full_name ?? "U").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase()}
+                                                </div>
+
+                                                {/* Info */}
+                                                <div className="flex-1 min-w-0">
+                                                    <p className="text-sm font-semibold text-gray-900 truncate">{u.full_name}</p>
+                                                    <p className="text-xs text-gray-400 truncate">{u.email}</p>
+                                                </div>
+
+                                                {/* Department badge */}
+                                                {u.department ? (
+                                                    <span className="hidden sm:inline-flex text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-200 px-2 py-0.5 rounded-lg flex-shrink-0">
+                                                        {u.department.name}
+                                                    </span>
+                                                ) : (
+                                                    <span className="hidden sm:inline-flex text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-lg flex-shrink-0">
+                                                        No dept.
+                                                    </span>
+                                                )}
+
+                                                {/* Time */}
+                                                <span className="hidden md:block text-[11px] text-gray-400 flex-shrink-0">
+                                                    {u.created_at ? timeAgo(u.created_at) : "—"}
+                                                </span>
+
+                                                {/* Review button */}
+                                                <button
+                                                    onClick={() => setSelectedUser(u)}
+                                                    className="flex-shrink-0 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-lg transition-all shadow-sm shadow-indigo-200"
+                                                >
+                                                    Review →
+                                                </button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
                         {/* Reports table + Compliance */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-2">
@@ -200,21 +458,32 @@ export default function AdminDashboard() {
                                     <ReportTable
                                         reports={recentReports}
                                         showEmployee={true}
-                                        onView={(report) => {
-                                            // Navigate to report detail or open modal — extend as needed
-                                            console.log("View report:", report.id);
-                                        }}
+                                        onView={(report) => console.log("View report:", report.id)}
                                     />
                                 )}
                             </div>
-                            <ComplianceBar
-                                departments={deptCompliance}
-                                title="Dept. Compliance"
-                            />
+                            <ComplianceBar departments={deptCompliance} title="Dept. Compliance" />
                         </div>
                     </>
                 )}
             </div>
+
+            {/* Approve Modal */}
+            {selectedUser && (
+                <ApproveModal
+                    user={selectedUser}
+                    onClose={() => setSelectedUser(null)}
+                    onApproved={handleApproved}
+                />
+            )}
+
+            {/* Toast */}
+            {toast && (
+                <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 bg-gray-900 text-white text-sm font-medium rounded-xl shadow-xl">
+                    <span className="text-emerald-400">✓</span>
+                    {toast}
+                </div>
+            )}
         </div>
     );
 }

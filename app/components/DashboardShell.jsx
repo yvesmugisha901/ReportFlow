@@ -1,8 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { getPendingUsers } from "@/lib/api/admin.api";
 
 const NAV = {
     admin: [
@@ -12,6 +13,7 @@ const NAV = {
         { label: "Schedules", href: "/dashboard/admin/schedules", icon: "🗓️" },
         { label: "Reports", href: "/dashboard/admin/reports", icon: "📋" },
         { label: "Employees", href: "/dashboard/admin/employees", icon: "👤" },
+        { label: "Pending Approvals", href: "/dashboard/admin/approvals", icon: "⏳", badge: true },
     ],
     employee: [
         { label: "Overview", href: "/dashboard/employee", icon: "⊞" },
@@ -41,9 +43,28 @@ export default function DashboardShell({ children }) {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [pendingCount, setPendingCount] = useState(0);
 
     const role = user?.role ?? "employee";
     const navItems = NAV[role] ?? NAV.employee;
+
+    // Poll pending count every 60s for admin
+    useEffect(() => {
+        if (role !== "admin") return;
+
+        const fetch = async () => {
+            try {
+                const data = await getPendingUsers();
+                setPendingCount(data.count ?? (data.users ?? []).length ?? 0);
+            } catch {
+                // silently fail — badge just won't show
+            }
+        };
+
+        fetch();
+        const interval = setInterval(fetch, 60000);
+        return () => clearInterval(interval);
+    }, [role]);
 
     const isActive = (href) => {
         if (href === `/dashboard/${role}`) return pathname === href;
@@ -54,6 +75,8 @@ export default function DashboardShell({ children }) {
         <nav className="flex-1 px-2 py-2 space-y-0.5 overflow-y-auto">
             {navItems.map((item) => {
                 const active = isActive(item.href);
+                const count = item.badge ? pendingCount : 0;
+
                 return (
                     <Link
                         key={item.href}
@@ -66,8 +89,23 @@ export default function DashboardShell({ children }) {
                             }`}
                     >
                         <span className="text-base flex-shrink-0 w-5 text-center">{item.icon}</span>
-                        {!collapsed && <span>{item.label}</span>}
-                        {active && !collapsed && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500" />}
+                        {!collapsed && <span className="flex-1">{item.label}</span>}
+
+                        {/* Pending badge */}
+                        {!collapsed && count > 0 && (
+                            <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full">
+                                {count > 99 ? "99+" : count}
+                            </span>
+                        )}
+
+                        {/* Collapsed badge dot */}
+                        {collapsed && count > 0 && (
+                            <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full" />
+                        )}
+
+                        {active && !collapsed && count === 0 && (
+                            <span className="ml-auto w-1.5 h-1.5 rounded-full bg-indigo-500" />
+                        )}
                     </Link>
                 );
             })}
@@ -177,12 +215,19 @@ export default function DashboardShell({ children }) {
                         </span>
                     </div>
                     <div className="flex items-center gap-2">
-                        <button className="relative p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
-                        </button>
+                        {/* Pending approvals bell for admin */}
+                        {role === "admin" && pendingCount > 0 && (
+                            <Link
+                                href="/dashboard/admin/approvals"
+                                className="relative p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors"
+                                title={`${pendingCount} pending approval${pendingCount !== 1 ? "s" : ""}`}
+                            >
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                                </svg>
+                                <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full" />
+                            </Link>
+                        )}
                         <div className="w-8 h-8 rounded-full bg-indigo-600 flex items-center justify-center text-white text-xs font-bold">
                             {getInitials(user?.full_name)}
                         </div>
