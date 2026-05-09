@@ -93,11 +93,15 @@ function ReportModal({ reportId, title, onClose }) {
                                     { label: "Team", value: report?.employee?.team?.name ?? "—" },
                                     { label: "Schedule", value: report?.schedule?.title ?? "—" },
                                     { label: "Submitted", value: report?.submitted_at ? new Date(report.submitted_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Not submitted" },
-                                    { label: "Status", value: report?.status ?? "—" },
+                                    {
+                                        label: "Status", value: report?.status
+                                            ? report.status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+                                            : "—"
+                                    },
                                 ].map(({ label, value }) => (
                                     <div key={label} className="bg-gray-50 rounded-xl px-4 py-3">
                                         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-0.5">{label}</p>
-                                        <p className="text-sm font-semibold text-gray-800 capitalize">{value}</p>
+                                        <p className="text-sm font-semibold text-gray-800">{value}</p>
                                     </div>
                                 ))}
                             </div>
@@ -114,16 +118,17 @@ function ReportModal({ reportId, title, onClose }) {
                                 </div>
                             )}
 
-                            {/* Attached file */}
-                            {report?.file_path && (
-                                <div>
-                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                                        Attached File
-                                    </p>
+                            {/* Attached file — always shown */}
+                            <div>
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                                    Attached File
+                                </p>
+                                {report?.file_path ? (
                                     <a
                                         href={report.file_path}
                                         target="_blank"
                                         rel="noreferrer"
+                                        download={report.file_name ?? true}
                                         className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-sm font-semibold text-indigo-600 hover:bg-indigo-100 transition-colors"
                                     >
                                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -131,8 +136,15 @@ function ReportModal({ reportId, title, onClose }) {
                                         </svg>
                                         {report.file_name ?? "Download file"}
                                     </a>
-                                </div>
-                            )}
+                                ) : (
+                                    <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-dashed border-gray-200 rounded-xl">
+                                        <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                        </svg>
+                                        <span className="text-sm text-gray-400">No file attached — this is a text report.</span>
+                                    </div>
+                                )}
+                            </div>
 
                             {/* No content or file */}
                             {!report?.content && !report?.file_path && (
