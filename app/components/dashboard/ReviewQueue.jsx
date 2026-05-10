@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import api from "@/lib/axios";
 
 /**
@@ -22,15 +22,16 @@ const ACTION_STYLES = {
     reject: "bg-rose-600    hover:bg-rose-700    text-white",
 };
 
+const FILE_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/api$/, "");
+
 // ── Report Content Modal ──────────────────────────────────────
 function ReportModal({ reportId, title, onClose }) {
     const [report, setReport] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
 
-    // Fetch full report detail on mount
-    useState(() => {
-        const fetch = async () => {
+    useEffect(() => {
+        const fetchReport = async () => {
             try {
                 const res = await api.get(`/reports/${reportId}`);
                 setReport(res.data.report ?? res.data);
@@ -40,8 +41,8 @@ function ReportModal({ reportId, title, onClose }) {
                 setLoading(false);
             }
         };
-        fetch();
-    });
+        fetchReport();
+    }, [reportId]);
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
@@ -92,7 +93,11 @@ function ReportModal({ reportId, title, onClose }) {
                                     { label: "Department", value: report?.employee?.department?.name ?? "—" },
                                     { label: "Team", value: report?.employee?.team?.name ?? "—" },
                                     { label: "Schedule", value: report?.schedule?.title ?? "—" },
-                                    { label: "Submitted", value: report?.submitted_at ? new Date(report.submitted_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "Not submitted" },
+                                    {
+                                        label: "Submitted", value: report?.submitted_at
+                                            ? new Date(report.submitted_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                                            : "Not submitted"
+                                    },
                                     {
                                         label: "Status", value: report?.status
                                             ? report.status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
@@ -118,14 +123,14 @@ function ReportModal({ reportId, title, onClose }) {
                                 </div>
                             )}
 
-                            {/* Attached file — always shown */}
+                            {/* Attached file */}
                             <div>
                                 <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
                                     Attached File
                                 </p>
                                 {report?.file_path ? (
                                     <a
-                                        href={report.file_path}
+                                        href={`${FILE_BASE_URL}${report.file_path}`}
                                         target="_blank"
                                         rel="noreferrer"
                                         download={report.file_name ?? true}
@@ -212,10 +217,10 @@ function ReportModal({ reportId, title, onClose }) {
 
 // ── Main ReviewQueue ──────────────────────────────────────────
 export default function ReviewQueue({ items = [], onAction, stage = 1, title }) {
-    const [open, setOpen] = useState(null);       // id of expanded action row
+    const [open, setOpen] = useState(null);
     const [comment, setComment] = useState("");
     const [done, setDone] = useState(new Set());
-    const [viewing, setViewing] = useState(null); // { id, title } of report being previewed
+    const [viewing, setViewing] = useState(null);
 
     const heading = title ?? `Stage ${stage} Review Queue`;
 
@@ -278,7 +283,7 @@ export default function ReviewQueue({ items = [], onAction, stage = 1, title }) 
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className="text-xs text-gray-400">{item.submittedAt}</span>
 
-                                            {/* View report button — always visible */}
+                                            {/* View report button */}
                                             <button
                                                 onClick={() => setViewing({ id: item.id, title: item.title })}
                                                 className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold border border-indigo-200 transition-colors flex items-center gap-1"
@@ -307,7 +312,6 @@ export default function ReviewQueue({ items = [], onAction, stage = 1, title }) 
                                     {isOpen && (
                                         <div className="px-5 pb-5 border-t border-dashed border-gray-100 bg-gray-50/50">
                                             <div className="pt-4">
-                                                {/* Remind reviewer to read first */}
                                                 <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl">
                                                     <span className="text-amber-500 flex-shrink-0">💡</span>
                                                     <p className="text-[11px] text-amber-700">

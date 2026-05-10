@@ -3,15 +3,6 @@ import { useState, useEffect, useRef } from "react";
 import api from "@/lib/axios";
 import { useAuth } from "@/context/AuthContext";
 
-/**
- * ReportForm — modal for submitting or resubmitting a report.
- *
- * Props:
- *  prefill?: { reportType, department, frequency }  — pre-fills from a schedule
- *  onClose:  () => void
- *  onSubmit: (formData) => Promise<void>            — caller handles the API call
- */
-
 const FREQUENCIES = ["weekly", "bi-weekly", "monthly", "quarterly"];
 
 function capitalize(str) {
@@ -43,14 +34,12 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
     });
     const [errors, setErrors] = useState({});
 
-    // Fetch real schedules from backend
     useEffect(() => {
         const load = async () => {
             try {
                 const res = await api.get("/schedules");
                 const list = res.data.schedules ?? res.data ?? [];
                 setSchedules(list);
-                // If prefill matches a schedule, pre-select it
                 if (prefill?.frequency) {
                     const match = list.find(s =>
                         s.frequency?.toLowerCase() === prefill.frequency?.toLowerCase()
@@ -60,7 +49,7 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                     }
                 }
             } catch {
-                // schedules optional — user can still submit without selecting one
+                // schedules optional
             } finally {
                 setLoadingSchedules(false);
             }
@@ -74,7 +63,6 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
         setSubmitError("");
     }
 
-    // When a schedule is selected, auto-fill frequency from it
     function handleScheduleChange(scheduleId) {
         set("schedule_id", scheduleId);
         if (scheduleId) {
@@ -119,7 +107,22 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
         setSubmitting(true);
         setSubmitError("");
         try {
-            await onSubmit(form);
+            // ── Build FormData so files are actually uploaded ──────────────
+            const fd = new FormData();
+            fd.append("title", form.title);
+            fd.append("content", form.details);
+            fd.append("summary", form.summary);
+            fd.append("notes", form.notes);
+            fd.append("period_start", form.periodStart);
+            fd.append("period_end", form.periodEnd);
+            if (form.schedule_id) fd.append("schedule_id", form.schedule_id);
+
+            // Attach every file the user picked
+            form.files.forEach((file) => {
+                fd.append("file", file); // backend reads req.file (single) or req.files (multiple)
+            });
+
+            await onSubmit(fd); // pass FormData up to the parent
             setSubmitted(true);
         } catch (err) {
             const msg = err?.response?.data?.error ?? "Submission failed. Please try again.";
@@ -187,7 +190,6 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                     {/* STEP 1 — Details */}
                     {!submitted && step === 1 && (
                         <div className="flex flex-col gap-4">
-                            {/* Schedule picker — real data from backend */}
                             <Field label="Report Schedule" hint="Optional — links to a deadline">
                                 {loadingSchedules ? (
                                     <div className="text-xs text-gray-400 py-2">Loading schedules…</div>
@@ -209,18 +211,11 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                 )}
                             </Field>
 
-                            {/* If a schedule is selected, show its linked dept/team */}
                             {selectedSchedule && (
                                 <div className="bg-indigo-50 rounded-xl px-4 py-3 text-xs text-indigo-700 flex flex-wrap gap-x-4 gap-y-1">
-                                    {selectedSchedule.department?.name && (
-                                        <span>🏢 {selectedSchedule.department.name}</span>
-                                    )}
-                                    {selectedSchedule.team?.name && (
-                                        <span>👥 {selectedSchedule.team.name}</span>
-                                    )}
-                                    {selectedSchedule.deadline && (
-                                        <span>📅 Due {new Date(selectedSchedule.deadline).toLocaleDateString()}</span>
-                                    )}
+                                    {selectedSchedule.department?.name && <span>🏢 {selectedSchedule.department.name}</span>}
+                                    {selectedSchedule.team?.name && <span>👥 {selectedSchedule.team.name}</span>}
+                                    {selectedSchedule.deadline && <span>📅 Due {new Date(selectedSchedule.deadline).toLocaleDateString()}</span>}
                                 </div>
                             )}
 
@@ -291,15 +286,28 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                 >
                                     <div className="text-2xl mb-1">📎</div>
                                     <p className="text-sm font-medium text-gray-600">Click to attach files</p>
-                                    <p className="text-xs text-gray-400">or drag and drop</p>
-                                    <input ref={fileInputRef} type="file" multiple accept=".pdf,.doc,.docx,.xlsx,.xls" className="hidden" onChange={handleFileChange} />
+                                    <p className="text-xs text-gray-400">PDF, DOCX, XLSX — max 10MB each</p>
+                                    <input
+                                        ref={fileInputRef}
+                                        type="file"
+                                        multiple
+                                        accept=".pdf,.doc,.docx,.xlsx,.xls"
+                                        className="hidden"
+                                        onChange={handleFileChange}
+                                    />
                                 </div>
                                 {form.files.length > 0 && (
                                     <ul className="mt-3 flex flex-col gap-1.5">
                                         {form.files.map((f, i) => (
                                             <li key={i} className="flex items-center justify-between bg-indigo-50 rounded-xl px-3 py-2">
-                                                <span className="text-xs font-medium text-indigo-700 truncate">{f.name}</span>
-                                                <button onClick={() => removeFile(i)} className="text-xs text-rose-500 hover:text-rose-700 ml-2 font-bold">✕</button>
+                                                <div className="flex items-center gap-2 min-w-0">
+                                                    <span className="text-indigo-400">📎</span>
+                                                    <span className="text-xs font-medium text-indigo-700 truncate">{f.name}</span>
+                                                    <span className="text-[10px] text-gray-400 shrink-0">
+                                                        ({(f.size / 1024 / 1024).toFixed(1)} MB)
+                                                    </span>
+                                                </div>
+                                                <button onClick={() => removeFile(i)} className="text-xs text-rose-500 hover:text-rose-700 ml-2 font-bold shrink-0">✕</button>
                                             </li>
                                         ))}
                                     </ul>
@@ -345,10 +353,16 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
 
                             {form.files.length > 0 && (
                                 <div className="bg-gray-50 rounded-2xl p-5">
-                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">Attachments ({form.files.length})</p>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2">
+                                        Attachments ({form.files.length})
+                                    </p>
                                     <ul className="flex flex-col gap-1">
                                         {form.files.map((f, i) => (
-                                            <li key={i} className="text-sm text-indigo-600 font-medium">📎 {f.name}</li>
+                                            <li key={i} className="text-sm text-indigo-600 font-medium flex items-center gap-2">
+                                                <span>📎</span>
+                                                <span className="truncate">{f.name}</span>
+                                                <span className="text-xs text-gray-400">({(f.size / 1024 / 1024).toFixed(1)} MB)</span>
+                                            </li>
                                         ))}
                                     </ul>
                                 </div>

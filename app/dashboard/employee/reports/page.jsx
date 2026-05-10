@@ -7,10 +7,9 @@ import ReportTable from "@/components/dashboard/ReportTable";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/axios";
 
-// ── Status normalizer: backend snake_case → UI Title Case ─────────────────────
 const STATUS_MAP = {
     pending: "Pending",
-    submitted: "Pending",         // treat submitted-but-not-yet-reviewed as Pending
+    submitted: "Pending",
     under_review: "Under Review",
     changes_requested: "Changes Requested",
     approved: "Approved",
@@ -27,11 +26,9 @@ const REVIEW_LOG_STATUS_MAP = {
     final_approved: "Approved",
 };
 
-/** Convert a raw backend report → shape the UI components expect */
 function normalizeReport(r) {
     const uiStatus = STATUS_MAP[r.status] ?? "Pending";
 
-    // Build history from reviewLogs
     const history = (r.reviewLogs ?? []).map((log) => ({
         status: REVIEW_LOG_STATUS_MAP[log.action] ?? log.action,
         actor: log.reviewer?.full_name ?? "System",
@@ -40,7 +37,6 @@ function normalizeReport(r) {
         comment: log.comment ?? null,
     }));
 
-    // Prepend an initial "Submitted" entry if there are logs but none marked submitted
     if (r.submitted_at && history.length > 0 && history[0].status !== "Submitted") {
         history.unshift({
             status: "Submitted",
@@ -51,7 +47,6 @@ function normalizeReport(r) {
         });
     }
 
-    // Last reviewer comment (for Changes Requested / Rejected card snippet)
     const lastLog = r.reviewLogs?.slice(-1)[0];
     const reviewerComment = lastLog?.comment ?? null;
 
@@ -70,7 +65,6 @@ function normalizeReport(r) {
         status: uiStatus,
         reviewerComment,
         history,
-        // keep raw id for API calls
         _raw: r,
     };
 }
@@ -82,7 +76,6 @@ function capitalize(str) {
 
 const ALL_STATUSES = ["All", "Pending", "Under Review", "Approved", "Changes Requested", "Rejected"];
 
-// ─── Component ────────────────────────────────────────────────────────────────
 export default function EmployeeReportsPage() {
     const { user } = useAuth();
     const [reports, setReports] = useState([]);
@@ -120,7 +113,6 @@ export default function EmployeeReportsPage() {
         return acc;
     }, {});
 
-    // Table-compatible flat shape
     const tableReports = filtered.map((r) => ({
         id: r.id,
         title: r.title,
@@ -137,28 +129,18 @@ export default function EmployeeReportsPage() {
         setShowForm(true);
     }
 
+    // ── UPDATED: formData is now a FormData object from ReportForm ────────────
     async function handleFormSubmit(formData) {
         try {
             if (resubmitReport) {
-                // Resubmit existing report
-                await api.patch(`/reports/${resubmitReport.id}/submit`, {
-                    title: formData.title,
-                    content: formData.details,
-                    summary: formData.summary,
-                    notes: formData.notes,
-                    period_start: formData.periodStart,
-                    period_end: formData.periodEnd,
+                // Resubmit existing report with file support
+                await api.patch(`/reports/${resubmitReport.id}/submit`, formData, {
+                    headers: { "Content-Type": "multipart/form-data" },
                 });
             } else {
-                // Create new report then submit it
-                const createRes = await api.post("/reports", {
-                    title: formData.title,
-                    content: formData.details,
-                    summary: formData.summary,
-                    notes: formData.notes,
-                    period_start: formData.periodStart,
-                    period_end: formData.periodEnd,
-                    schedule_id: formData.schedule_id ?? null,
+                // Create new report with file support, then submit it
+                const createRes = await api.post("/reports", formData, {
+                    headers: { "Content-Type": "multipart/form-data" },
                 });
                 const newId = createRes.data.report?.report_id;
                 if (newId) {
@@ -167,19 +149,18 @@ export default function EmployeeReportsPage() {
             }
             setShowForm(false);
             setResubmit(null);
-            load(); // refresh list
+            load();
         } catch (err) {
             console.error("Submit failed:", err);
-            // let ReportForm handle its own error display — re-throw so it can catch
-            throw err;
+            throw err; // re-throw so ReportForm shows the error
         }
     }
+    // ─────────────────────────────────────────────────────────────────────────
 
     const deptName = user?.department?.name ?? user?.dept_name ?? "Your Department";
 
     return (
         <div className="min-h-screen bg-[#f8f9fc] text-[#0f1117]">
-            {/* Ambient */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
                 <div className="absolute -top-40 right-0 w-[500px] h-[500px] rounded-full bg-sky-100 blur-[120px]" />
                 <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-indigo-100 blur-[100px]" />
@@ -187,7 +168,7 @@ export default function EmployeeReportsPage() {
 
             <div className="relative z-10 max-w-6xl mx-auto px-6 py-8">
 
-                {/* ── Page Header ── */}
+                {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
                         <p className="text-sm text-gray-500 mb-1">{deptName}</p>
@@ -204,7 +185,7 @@ export default function EmployeeReportsPage() {
                     </button>
                 </div>
 
-                {/* ── Loading / Error states ── */}
+                {/* Loading / Error */}
                 {loading ? (
                     <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
                 ) : error ? (
@@ -214,7 +195,7 @@ export default function EmployeeReportsPage() {
                     </div>
                 ) : (
                     <>
-                        {/* ── Status Filter Pills ── */}
+                        {/* Status Filter Pills */}
                         <div className="flex flex-wrap gap-2 mb-6">
                             <button
                                 onClick={() => setStatus("All")}
@@ -237,7 +218,7 @@ export default function EmployeeReportsPage() {
                             ))}
                         </div>
 
-                        {/* ── Toolbar ── */}
+                        {/* Toolbar */}
                         <div className="flex items-center justify-between mb-4">
                             <p className="text-xs text-gray-400">{filtered.length} report{filtered.length !== 1 ? "s" : ""}</p>
                             <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
@@ -256,7 +237,7 @@ export default function EmployeeReportsPage() {
                             </div>
                         </div>
 
-                        {/* ── Grid View ── */}
+                        {/* Grid View */}
                         {view === "grid" && (
                             filtered.length === 0 ? (
                                 <div className="text-center py-20 text-gray-400">
@@ -272,7 +253,7 @@ export default function EmployeeReportsPage() {
                             )
                         )}
 
-                        {/* ── Table View ── */}
+                        {/* Table View */}
                         {view === "table" && (
                             <ReportTable
                                 reports={tableReports}
@@ -284,7 +265,7 @@ export default function EmployeeReportsPage() {
                 )}
             </div>
 
-            {/* ── ReportForm Modal ── */}
+            {/* ReportForm Modal */}
             {showForm && (
                 <ReportForm
                     prefill={resubmitReport
@@ -295,7 +276,7 @@ export default function EmployeeReportsPage() {
                 />
             )}
 
-            {/* ── ReportStatusHistory Modal ── */}
+            {/* ReportStatusHistory Modal */}
             {selectedReport && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
