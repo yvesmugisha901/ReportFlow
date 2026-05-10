@@ -33,7 +33,9 @@ function normalizeReport(r) {
         status: REVIEW_LOG_STATUS_MAP[log.action] ?? log.action,
         actor: log.reviewer?.full_name ?? "System",
         role: log.reviewer?.role ?? "",
-        date: log.createdAt ? new Date(log.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—",
+        date: log.createdAt
+            ? new Date(log.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            : "—",
         comment: log.comment ?? null,
     }));
 
@@ -129,23 +131,21 @@ export default function EmployeeReportsPage() {
         setShowForm(true);
     }
 
-    // ── UPDATED: formData is now a FormData object from ReportForm ────────────
+    // ── Submit handler — single step only, no double PATCH ───
     async function handleFormSubmit(formData) {
         try {
             if (resubmitReport) {
-                // Resubmit existing report with file support
-                await api.patch(`/reports/${resubmitReport.id}/submit`, formData, {
+                // For resubmit after changes_requested: update the existing report
+                // then flip it back to submitted via the submit endpoint
+                await api.put(`/reports/${resubmitReport.id}`, formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
+                await api.patch(`/reports/${resubmitReport.id}/submit`);
             } else {
-                // Create new report with file support, then submit it
-                const createRes = await api.post("/reports", formData, {
+                // New report: POST creates and auto-submits in one step (status='submitted' on create)
+                await api.post("/reports", formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
-                const newId = createRes.data.report?.report_id;
-                if (newId) {
-                    await api.patch(`/reports/${newId}/submit`);
-                }
             }
             setShowForm(false);
             setResubmit(null);
@@ -155,7 +155,6 @@ export default function EmployeeReportsPage() {
             throw err; // re-throw so ReportForm shows the error
         }
     }
-    // ─────────────────────────────────────────────────────────────────────────
 
     const deptName = user?.department?.name ?? user?.dept_name ?? "Your Department";
 
@@ -185,7 +184,6 @@ export default function EmployeeReportsPage() {
                     </button>
                 </div>
 
-                {/* Loading / Error */}
                 {loading ? (
                     <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
                 ) : error ? (

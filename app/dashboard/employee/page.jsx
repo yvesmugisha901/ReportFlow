@@ -8,7 +8,6 @@ import ReportForm from "@/components/reports/ReportForm";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/axios";
 
-// ── Status normalizer ─────────────────────────────────────────
 const STATUS_MAP = {
     pending: "Pending",
     submitted: "Pending",
@@ -16,14 +15,6 @@ const STATUS_MAP = {
     changes_requested: "Changes Requested",
     approved: "Approved",
     rejected: "Rejected",
-};
-
-const STATUS_UI = {
-    "Pending": { label: "Pending", color: "amber" },
-    "Under Review": { label: "Under Review", color: "sky" },
-    "Approved": { label: "Approved", color: "emerald" },
-    "Changes Requested": { label: "Changes Requested", color: "violet" },
-    "Rejected": { label: "Rejected", color: "rose" },
 };
 
 function normalizeReport(r) {
@@ -54,7 +45,7 @@ function normalizeSchedule(s) {
         department: s.department?.name ?? "—",
         dueDate: s.deadline,
         frequency: s.frequency,
-        submitted: false, // will be cross-referenced with reports
+        submitted: false,
     };
 }
 
@@ -82,7 +73,6 @@ export default function EmployeeDashboard() {
             const normalized = rawReports.map(normalizeReport);
             setReports(normalized);
 
-            // Mark schedules as submitted if employee already has a report for that schedule
             const submittedScheduleIds = new Set(
                 normalized
                     .filter(r => r.status !== "Pending")
@@ -93,7 +83,7 @@ export default function EmployeeDashboard() {
             setSchedules(
                 rawSchedules
                     .map(s => ({ ...normalizeSchedule(s), submitted: submittedScheduleIds.has(s.schedule_id) }))
-                    .filter(s => s.dueDate && new Date(s.dueDate) >= new Date()) // upcoming only
+                    .filter(s => s.dueDate && new Date(s.dueDate) >= new Date())
                     .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
                     .slice(0, 5)
             );
@@ -106,7 +96,6 @@ export default function EmployeeDashboard() {
 
     useEffect(() => { load(); }, [load]);
 
-    // ── Derived stats ─────────────────────────────────────────
     const counts = {
         total: reports.length,
         approved: reports.filter(r => r.status === "Approved").length,
@@ -121,7 +110,6 @@ export default function EmployeeDashboard() {
         { label: "Needs Changes", value: counts.changes, icon: "✏️", color: "rose" },
     ];
 
-    // Table shape (recent 5)
     const tableReports = reports.slice(0, 5).map(r => ({
         id: r.id,
         title: r.title,
@@ -132,11 +120,9 @@ export default function EmployeeDashboard() {
         status: r.status,
     }));
 
-    // Overdue / upcoming deadline message
     const nextDue = schedules.find(s => !s.submitted);
     const overdueCount = reports.filter(r => r.is_late && r.status !== "approved").length;
 
-    // ── Activity feed built from real reports ─────────────────
     const activities = reports.slice(0, 6).map(r => {
         const typeMap = {
             "Approved": { type: "approved", message: "Your report was approved" },
@@ -155,20 +141,12 @@ export default function EmployeeDashboard() {
         };
     });
 
+    // ── Single-step submit: FormData goes straight to POST /reports
+    // The controller now sets status='submitted' on create, so no PATCH needed.
     async function handleFormSubmit(formData) {
-        const createRes = await api.post("/reports", {
-            title: formData.title,
-            content: formData.details,
-            summary: formData.summary,
-            notes: formData.notes,
-            period_start: formData.periodStart,
-            period_end: formData.periodEnd,
-            schedule_id: formData.schedule_id || null,
+        await api.post("/reports", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
         });
-        const newId = createRes.data.report?.report_id;
-        if (newId) {
-            await api.patch(`/reports/${newId}/submit`);
-        }
         setShowForm(false);
         setPrefill(null);
         load();
@@ -212,7 +190,6 @@ export default function EmployeeDashboard() {
                     </button>
                 </div>
 
-                {/* Loading / Error */}
                 {loading ? (
                     <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
                 ) : error ? (
@@ -222,12 +199,10 @@ export default function EmployeeDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* Stats */}
                         <div className="mb-6">
                             <StatsGrid stats={stats} cols={4} />
                         </div>
 
-                        {/* Overdue / upcoming banner */}
                         {(overdueCount > 0 || nextDue) && (
                             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-center gap-3">
                                 <span className="text-xl">⚠️</span>
@@ -258,7 +233,6 @@ export default function EmployeeDashboard() {
                         )}
 
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* Recent reports table */}
                             <div className="lg:col-span-2">
                                 {tableReports.length === 0 ? (
                                     <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400">
@@ -275,7 +249,6 @@ export default function EmployeeDashboard() {
                                 )}
                             </div>
 
-                            {/* Right column */}
                             <div className="flex flex-col gap-6">
                                 <ScheduleList
                                     schedules={schedules}
@@ -293,7 +266,6 @@ export default function EmployeeDashboard() {
                 )}
             </div>
 
-            {/* ReportForm modal */}
             {showForm && (
                 <ReportForm
                     prefill={prefilledSchedule}

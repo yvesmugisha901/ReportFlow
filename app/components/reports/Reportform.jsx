@@ -20,6 +20,7 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
     const [submitted, setSubmitted] = useState(false);
     const [submitError, setSubmitError] = useState("");
     const fileInputRef = useRef(null);
+    const bodyRef = useRef(null);
 
     const [form, setForm] = useState({
         schedule_id: "",
@@ -89,9 +90,17 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
         return Object.keys(e).length === 0;
     }
 
+    // ── Fixed: else if prevents both conditions firing at once ──
     function handleNext() {
-        if (step === 1 && validateStep1()) setStep(2);
-        if (step === 2 && validateStep2()) setStep(3);
+        if (step === 1 && validateStep1()) {
+            setStep(2);
+        } else if (step === 2) {
+            if (validateStep2()) {
+                setStep(3);
+            } else {
+                bodyRef.current?.scrollTo({ top: 0, behavior: "smooth" });
+            }
+        }
     }
 
     function handleFileChange(e) {
@@ -107,7 +116,6 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
         setSubmitting(true);
         setSubmitError("");
         try {
-            // ── Build FormData so files are actually uploaded ──────────────
             const fd = new FormData();
             fd.append("title", form.title);
             fd.append("content", form.details);
@@ -117,12 +125,12 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
             fd.append("period_end", form.periodEnd);
             if (form.schedule_id) fd.append("schedule_id", form.schedule_id);
 
-            // Attach every file the user picked
+            // Use "files[]" to match multer's upload.array('files[]', 10)
             form.files.forEach((file) => {
-                fd.append("file", file); // backend reads req.file (single) or req.files (multiple)
+                fd.append("files[]", file);
             });
 
-            await onSubmit(fd); // pass FormData up to the parent
+            await onSubmit(fd);
             setSubmitted(true);
         } catch (err) {
             const msg = err?.response?.data?.error ?? "Submission failed. Please try again.";
@@ -176,7 +184,7 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                 </div>
 
                 {/* Form Body */}
-                <div className="flex-1 overflow-y-auto px-6 py-5">
+                <div ref={bodyRef} className="flex-1 overflow-y-auto px-6 py-5">
 
                     {/* SUCCESS */}
                     {submitted && (
