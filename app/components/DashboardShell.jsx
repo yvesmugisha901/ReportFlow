@@ -20,7 +20,6 @@ const NAV = {
     employee: [
         { label: "Overview", href: "/dashboard/employee", icon: "grid" },
         { label: "My Reports", href: "/dashboard/employee/reports", icon: "file-text" },
-        { label: "Submit Report", href: "/dashboard/employee/reports/new", icon: "plus-circle" },
         { label: "Notifications", href: "/dashboard/employee/notifications", icon: "bell", badge: true, badgeKey: "notifications" },
         { label: "Settings", href: "/dashboard/employee/settings", icon: "settings" },
     ],
@@ -46,7 +45,6 @@ function getInitials(name) {
     return (name ?? "U").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
 }
 
-/* ─── SVG Icon set — render functions (avoids Next.js RSC serialization error) ── */
 const Icon = ({ name }) => {
     const S = { width: "16", height: "16", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round" };
     switch (name) {
@@ -67,17 +65,13 @@ const Icon = ({ name }) => {
         case "menu": return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>;
         case "chevronLeft": return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>;
         case "chevronRight": return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>;
-        case "chevronSep": return <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>;
         default: return <svg {...S}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>;
     }
 };
 
-
-/* ─── Styles injected once ─────────────────────────────────────────────── */
 const GLOBAL_STYLE = `
 @import url('https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600&display=swap');
 
-/* ALL variables and resets scoped to .rf-shell — zero bleed into page content */
 .rf-shell, .rf-shell *, .rf-shell *::before, .rf-shell *::after {
     box-sizing: border-box;
 }
@@ -106,11 +100,9 @@ const GLOBAL_STYLE = `
     font-family: 'Geist', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
-/* hide native scrollbar everywhere in sidebar */
 .rf-sidebar nav::-webkit-scrollbar { display: none; }
 .rf-sidebar nav { scrollbar-width: none; -ms-overflow-style: none; }
 
-/* ── Shell layout ──────────── */
 .rf-shell {
     display: flex;
     height: 100vh;
@@ -118,7 +110,6 @@ const GLOBAL_STYLE = `
     overflow: hidden;
 }
 
-/* ── Sidebar ───────────────── */
 .rf-sidebar {
     display: flex;
     flex-direction: column;
@@ -132,7 +123,6 @@ const GLOBAL_STYLE = `
 }
 .rf-sidebar.collapsed { width: var(--rf-sidebar-collapsed); }
 
-/* brand row */
 .rf-brand {
     display: flex;
     align-items: center;
@@ -163,7 +153,6 @@ const GLOBAL_STYLE = `
 }
 .rf-sidebar.collapsed .rf-brand-name { opacity: 0; pointer-events: none; }
 
-/* nav */
 .rf-nav {
     flex: 1;
     padding: 10px 8px;
@@ -173,7 +162,6 @@ const GLOBAL_STYLE = `
     gap: 4px;
 }
 
-/* nav item */
 .rf-nav-item {
     display: flex;
     align-items: center;
@@ -212,7 +200,6 @@ const GLOBAL_STYLE = `
 }
 .rf-sidebar.collapsed .rf-nav-label { opacity: 0; width: 0; pointer-events: none; }
 
-/* badge */
 .rf-badge {
     min-width: 18px; height: 18px;
     padding: 0 5px;
@@ -227,7 +214,6 @@ const GLOBAL_STYLE = `
 }
 .rf-sidebar.collapsed .rf-badge { opacity: 0; pointer-events: none; }
 
-/* collapsed badge dot */
 .rf-badge-dot {
     position: absolute;
     top: 7px; right: 7px;
@@ -240,7 +226,6 @@ const GLOBAL_STYLE = `
 }
 .rf-sidebar.collapsed .rf-badge-dot { opacity: 1; }
 
-/* active indicator dot */
 .rf-active-dot {
     width: 5px; height: 5px;
     border-radius: 50%;
@@ -250,7 +235,6 @@ const GLOBAL_STYLE = `
 }
 .rf-sidebar.collapsed .rf-active-dot { opacity: 0; }
 
-/* section divider */
 .rf-nav-divider {
     height: 1px;
     background: var(--rf-border-light);
@@ -258,7 +242,6 @@ const GLOBAL_STYLE = `
     flex-shrink: 0;
 }
 
-/* ── User footer ───────────── */
 .rf-user-footer {
     padding: 10px 8px;
     border-top: 1px solid var(--rf-border-light);
@@ -295,7 +278,6 @@ const GLOBAL_STYLE = `
     font-size: 12.5px;
     font-weight: 500;
     color: var(--rf-text-primary);
-    truncate: ellipsis;
     overflow: hidden;
     white-space: nowrap;
 }
@@ -313,14 +295,12 @@ const GLOBAL_STYLE = `
     color: var(--rf-text-muted);
     display: flex; align-items: center; justify-content: center;
     cursor: pointer;
-    transition: background var(--rf-transition), color var(--rf-transition);
     flex-shrink: 0;
-    transition: opacity var(--rf-transition);
+    transition: background var(--rf-transition), color var(--rf-transition), opacity var(--rf-transition);
 }
 .rf-logout-btn:hover { background: #fee2e2; color: #dc2626; }
 .rf-sidebar.collapsed .rf-logout-btn { opacity: 0; pointer-events: none; }
 
-/* ── Main area ─────────────── */
 .rf-main {
     flex: 1;
     display: flex;
@@ -329,7 +309,6 @@ const GLOBAL_STYLE = `
     overflow: hidden;
 }
 
-/* ── Top bar ───────────────── */
 .rf-topbar {
     display: flex;
     align-items: center;
@@ -344,7 +323,6 @@ const GLOBAL_STYLE = `
 .rf-topbar-left { display: flex; align-items: center; gap: 8px; }
 .rf-topbar-right { display: flex; align-items: center; gap: 6px; }
 
-/* breadcrumb area */
 .rf-breadcrumb {
     display: flex;
     align-items: center;
@@ -358,7 +336,6 @@ const GLOBAL_STYLE = `
     letter-spacing: -.1px;
 }
 
-/* collapse toggle */
 .rf-toggle-btn {
     width: 30px; height: 30px;
     border-radius: var(--rf-radius-sm);
@@ -371,7 +348,6 @@ const GLOBAL_STYLE = `
 }
 .rf-toggle-btn:hover { background: var(--rf-hover); color: var(--rf-text-primary); }
 
-/* mobile hamburger */
 .rf-hamburger {
     width: 32px; height: 32px;
     border-radius: var(--rf-radius-sm);
@@ -382,7 +358,6 @@ const GLOBAL_STYLE = `
     cursor: pointer;
 }
 
-/* notif / bell icon button */
 .rf-icon-btn {
     position: relative;
     width: 32px; height: 32px;
@@ -405,7 +380,6 @@ const GLOBAL_STYLE = `
     border: 1.5px solid #fff;
 }
 
-/* topbar avatar */
 .rf-topbar-avatar {
     width: 30px; height: 30px;
     border-radius: 8px;
@@ -416,7 +390,6 @@ const GLOBAL_STYLE = `
     letter-spacing: .3px;
 }
 
-/* ── Page content ──────────── */
 .rf-content {
     flex: 1;
     overflow-y: auto;
@@ -425,7 +398,6 @@ const GLOBAL_STYLE = `
 .rf-content::-webkit-scrollbar-track { background: transparent; }
 .rf-content::-webkit-scrollbar-thumb { background: var(--rf-border); border-radius: 4px; }
 
-/* ── Mobile sidebar overlay ── */
 .rf-mobile-overlay {
     position: fixed; inset: 0; z-index: 40;
     background: rgba(0,0,0,.15);
@@ -449,7 +421,6 @@ const GLOBAL_STYLE = `
 }
 .rf-mobile-sidebar.open { transform: translateX(0); }
 
-/* ── Responsive ────────────── */
 @media (max-width: 768px) {
     .rf-sidebar { display: none; }
     .rf-desktop-only { display: none !important; }
@@ -468,7 +439,6 @@ function injectStyles() {
     styleInjected = true;
 }
 
-/* ─────────────────────────────────────────────────────────────────────── */
 export default function DashboardShell({ children }) {
     injectStyles();
 
@@ -482,7 +452,6 @@ export default function DashboardShell({ children }) {
     const role = user?.role ?? "employee";
     const navItems = NAV[role] ?? NAV.employee;
     const roleColor = ROLE_COLORS[role] ?? "#6366f1";
-    const roleLight = ROLE_LIGHT[role] ?? "#eef2ff";
 
     /* stale-role guard */
     useEffect(() => {
@@ -498,7 +467,7 @@ export default function DashboardShell({ children }) {
                 try {
                     const data = await getPendingUsers();
                     setPendingCount(data.count ?? (data.users ?? []).length);
-                } catch { /* silent */ }
+                } catch { }
             };
             fetchPending();
             const t = setInterval(fetchPending, 60000);
@@ -510,7 +479,7 @@ export default function DashboardShell({ children }) {
                     const { default: api } = await import("@/lib/axios");
                     const res = await api.get("/reviews/pending");
                     setPendingCount((res.data.reports ?? []).length);
-                } catch { /* silent */ }
+                } catch { }
             };
             fetchQueue();
             const t = setInterval(fetchQueue, 60000);
@@ -522,7 +491,7 @@ export default function DashboardShell({ children }) {
                     const { default: api } = await import("@/lib/axios");
                     const res = await api.get("/notifications/unread-count");
                     setNotifCount(res.data.count ?? 0);
-                } catch { /* silent */ }
+                } catch { }
             };
             fetchNotifs();
             const t = setInterval(fetchNotifs, 30000);
@@ -530,32 +499,41 @@ export default function DashboardShell({ children }) {
         }
     }, [role]);
 
-    const isActive = (href) =>
-        href === `/dashboard/${role}` ? pathname === href : pathname.startsWith(href);
+    // ── Fixed isActive: exact match for root, precise prefix for sections ──
+    const isActive = (href) => {
+        // Dashboard root — exact match only
+        if (href === `/dashboard/${role}`) {
+            return pathname === href;
+        }
+        // All other nav items — match exact or direct children only
+        // e.g. /dashboard/employee/reports matches /dashboard/employee/reports
+        // and /dashboard/employee/reports/123 but NOT /dashboard/employee/reports-new
+        return pathname === href || pathname.startsWith(href + "/");
+    };
 
     function getBadgeCount(item) {
         if (!item.badge) return 0;
         if (item.badgeKey === "notifications") return notifCount;
         if (item.badgeKey === "queue") return pendingCount;
-        return pendingCount;
+        return pendingCount; // admin approvals badge
     }
 
-    const activeLabel = navItems.find(n => isActive(n.href))?.label ?? "Dashboard";
+    // Breadcrumb label — find deepest matching nav item
+    const activeLabel = [...navItems]
+        .reverse()
+        .find(n => isActive(n.href))?.label ?? "Dashboard";
+
     const initials = getInitials(user?.full_name);
-
-    /* nav divider positions — insert divider before "Settings" */
     const shouldDivide = (idx) => navItems[idx]?.icon === "settings" && idx > 0;
+    const notifTotal = role === "employee" ? notifCount : pendingCount;
 
-    /* ── Shared sidebar inner content ─── */
-    const SidebarContent = ({ isMobile = false, onNavigate }) => (
+    const SidebarContent = ({ onNavigate }) => (
         <>
-            {/* Brand */}
             <div className="rf-brand">
                 <div className="rf-brand-icon">RF</div>
                 <span className="rf-brand-name">ReportFlow</span>
             </div>
 
-            {/* Nav */}
             <nav className="rf-nav" role="navigation" aria-label="Main navigation">
                 {navItems.map((item, idx) => {
                     const active = isActive(item.href);
@@ -590,7 +568,6 @@ export default function DashboardShell({ children }) {
                 })}
             </nav>
 
-            {/* User footer */}
             <div className="rf-user-footer">
                 <div className="rf-user-card">
                     <div className="rf-avatar" style={{ background: roleColor }}>
@@ -613,16 +590,14 @@ export default function DashboardShell({ children }) {
         </>
     );
 
-    const notifTotal = role === "employee" ? notifCount : (role !== "employee" ? pendingCount : 0);
-
     return (
         <div className="rf-shell">
-            {/* ── Desktop sidebar ── */}
+            {/* Desktop sidebar */}
             <aside className={`rf-sidebar rf-desktop-only${collapsed ? " collapsed" : ""}`} aria-label="Sidebar">
                 <SidebarContent onNavigate={undefined} />
             </aside>
 
-            {/* ── Mobile overlay ── */}
+            {/* Mobile overlay */}
             {mobileOpen && (
                 <div
                     className="rf-mobile-overlay rf-mobile-only"
@@ -631,20 +606,18 @@ export default function DashboardShell({ children }) {
                 />
             )}
 
-            {/* ── Mobile sidebar ── */}
+            {/* Mobile sidebar */}
             <aside
                 className={`rf-mobile-sidebar rf-mobile-only${mobileOpen ? " open" : ""}`}
                 aria-label="Mobile sidebar"
             >
-                <SidebarContent isMobile onNavigate={() => setMobileOpen(false)} />
+                <SidebarContent onNavigate={() => setMobileOpen(false)} />
             </aside>
 
-            {/* ── Main ── */}
+            {/* Main */}
             <div className="rf-main">
-                {/* Top bar */}
                 <header className="rf-topbar">
                     <div className="rf-topbar-left">
-                        {/* Mobile hamburger */}
                         <button
                             className="rf-hamburger rf-mobile-only"
                             onClick={() => setMobileOpen(true)}
@@ -653,7 +626,6 @@ export default function DashboardShell({ children }) {
                             <Icon name="menu" />
                         </button>
 
-                        {/* Desktop collapse */}
                         <button
                             className="rf-toggle-btn rf-desktop-only"
                             onClick={() => setCollapsed(c => !c)}
@@ -662,24 +634,26 @@ export default function DashboardShell({ children }) {
                             {collapsed ? <Icon name="chevronRight" /> : <Icon name="chevronLeft" />}
                         </button>
 
-                        {/* Breadcrumb */}
                         <div className="rf-breadcrumb">
                             <span className="rf-breadcrumb-sep" aria-hidden="true">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="9 18 15 12 9 6" />
+                                </svg>
                             </span>
                             <span className="rf-breadcrumb-page">{activeLabel}</span>
                         </div>
                     </div>
 
                     <div className="rf-topbar-right">
-                        {/* Notification bell */}
                         {notifTotal > 0 && (
                             <Link
-                                href={role === "employee"
-                                    ? "/dashboard/employee/notifications"
-                                    : role === "admin"
-                                        ? "/dashboard/admin/approvals"
-                                        : `#`}
+                                href={
+                                    role === "employee"
+                                        ? "/dashboard/employee/notifications"
+                                        : role === "admin"
+                                            ? "/dashboard/admin/approvals"
+                                            : "#"
+                                }
                                 className="rf-icon-btn"
                                 aria-label={`${notifTotal} notification${notifTotal !== 1 ? "s" : ""}`}
                             >
@@ -688,11 +662,9 @@ export default function DashboardShell({ children }) {
                             </Link>
                         )}
 
-                        {/* Avatar */}
                         <div
                             className="rf-topbar-avatar"
                             style={{ background: roleColor }}
-                            aria-label={user?.full_name ?? "User"}
                             title={user?.full_name ?? "User"}
                         >
                             {initials}
@@ -700,7 +672,6 @@ export default function DashboardShell({ children }) {
                     </div>
                 </header>
 
-                {/* Page content */}
                 <main className="rf-content" id="main-content">
                     {children}
                 </main>

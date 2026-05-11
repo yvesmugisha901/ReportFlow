@@ -24,6 +24,8 @@ export default function NotificationsPage() {
     const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [deletingId, setDeletingId] = useState(null);
+    const [clearingRead, setClearingRead] = useState(false);
 
     const load = useCallback(async () => {
         try {
@@ -40,21 +42,59 @@ export default function NotificationsPage() {
 
     useEffect(() => { load(); }, [load]);
 
-    async function markAllRead() {
-        try {
-            await api.patch("/notifications/mark-all-read");
-            setNotifications(n => n.map(x => ({ ...x, is_read: true })));
-        } catch { /* silent */ }
-    }
-
+    // Mark single as read + optimistic update
     async function markRead(id) {
+        if (!id) return;
+        setNotifications(n =>
+            n.map(x => x.notif_id === id ? { ...x, is_read: true } : x)
+        );
         try {
             await api.patch(`/notifications/${id}/read`);
-            setNotifications(n => n.map(x => x.notif_id === id ? { ...x, is_read: true } : x));
-        } catch { /* silent */ }
+        } catch {
+            // revert optimistic update on failure
+            load();
+        }
+    }
+
+    // Mark all read + optimistic update
+    async function markAllRead() {
+        setNotifications(n => n.map(x => ({ ...x, is_read: true })));
+        try {
+            await api.patch("/notifications/mark-all-read");
+        } catch {
+            load();
+        }
+    }
+
+    // Delete single notification
+    async function deleteOne(e, id) {
+        e.stopPropagation(); // prevent triggering markRead
+        setDeletingId(id);
+        try {
+            await api.delete(`/notifications/${id}`);
+            setNotifications(n => n.filter(x => x.notif_id !== id));
+        } catch {
+            load();
+        } finally {
+            setDeletingId(null);
+        }
+    }
+
+    // Delete all read notifications
+    async function clearAllRead() {
+        setClearingRead(true);
+        try {
+            await api.delete("/notifications/read");
+            setNotifications(n => n.filter(x => !x.is_read));
+        } catch {
+            load();
+        } finally {
+            setClearingRead(false);
+        }
     }
 
     const unread = notifications.filter(n => !n.is_read).length;
+    const hasRead = notifications.some(n => n.is_read);
 
     return (
         <div className="min-h-screen bg-[#f8f9fc]">
@@ -69,12 +109,27 @@ export default function NotificationsPage() {
                             <p className="text-xs text-indigo-600 font-semibold mt-1">{unread} unread</p>
                         )}
                     </div>
-                    {unread > 0 && (
-                        <button onClick={markAllRead}
-                            className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors">
-                            Mark all read
-                        </button>
-                    )}
+
+                    {/* Action buttons */}
+                    <div className="flex items-center gap-2">
+                        {hasRead && (
+                            <button
+                                onClick={clearAllRead}
+                                disabled={clearingRead}
+                                className="px-4 py-2 bg-white border border-red-200 rounded-xl text-sm font-semibold text-red-500 hover:bg-red-50 transition-colors disabled:opacity-50"
+                            >
+                                {clearingRead ? "Clearing…" : "Clear read"}
+                            </button>
+                        )}
+                        {unread > 0 && (
+                            <button
+                                onClick={markAllRead}
+                                className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-50 transition-colors"
+                            >
+                                Mark all read
+                            </button>
+                        )}
+                    </div>
                 </div>
 
                 {loading ? (
@@ -96,20 +151,44 @@ export default function NotificationsPage() {
                             <div
                                 key={n.notif_id}
                                 onClick={() => !n.is_read && markRead(n.notif_id)}
-                                className={`relative rounded-2xl border p-4 cursor-pointer transition-all ${EVENT_COLORS[n.event_type] ?? "bg-white border-gray-200"
-                                    } ${!n.is_read ? "shadow-sm" : "opacity-70"}`}
+                                className={`group relative rounded-2xl border p-4 transition-all ${EVENT_COLORS[n.event_type] ?? "bg-white border-gray-200"
+                                    } ${!n.is_read ? "cursor-pointer shadow-sm" : "opacity-70"}`}
                             >
+                                {/* Unread dot */}
                                 {!n.is_read && (
-                                    <span className="absolute top-3 right-3 w-2 h-2 rounded-full bg-indigo-500" />
+                                    <span className="absolute top-3 right-10 w-2 h-2 rounded-full bg-indigo-500" />
                                 )}
-                                <div className="flex items-start gap-3">
-                                    <span className="text-xl flex-shrink-0">{EVENT_ICONS[n.event_type] ?? "🔔"}</span>
+
+                                {/* Delete button — visible on hover */}
+                                <button
+                                    onClick={(e) => deleteOne(e, n.notif_id)}
+                                    disabled={deletingId === n.notif_id}
+                                    className="absolute top-2.5 right-2.5 w-6 h-6 rounded-lg flex items-center justify-center text-gray-300 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100 transition-all disabled:opacity-50"
+                                    title="Delete notification"
+                                    aria-label="Delete notification"
+                                >
+                                    {deletingId === n.notif_id ? (
+                                        <svg className="w-3 h-3 animate-spin" fill="none" viewBox="0 0 24 24">
+                                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                                        </svg>
+                                    ) : (
+                                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                        </svg>
+                                    )}
+                                </button>
+
+                                <div className="flex items-start gap-3 pr-6">
+                                    <span className="text-xl flex-shrink-0">
+                                        {EVENT_ICONS[n.event_type] ?? "🔔"}
+                                    </span>
                                     <div className="flex-1 min-w-0">
                                         <p className="text-sm font-semibold text-gray-800">{n.message}</p>
                                         <p className="text-xs text-gray-500 mt-0.5">
                                             {new Date(n.created_at).toLocaleDateString("en-US", {
                                                 month: "short", day: "numeric", year: "numeric",
-                                                hour: "2-digit", minute: "2-digit"
+                                                hour: "2-digit", minute: "2-digit",
                                             })}
                                         </p>
                                     </div>
