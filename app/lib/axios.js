@@ -6,17 +6,29 @@ const api = axios.create({
     baseURL: API_BASE_URL,
     headers: {
         "Content-Type": "application/json",
+        "Cache-Control": "no-store",
+        "Pragma": "no-cache",
     },
 });
 
-// Attach JWT token to every request automatically
+// Attach JWT token + cache-bust timestamp to every request
 api.interceptors.request.use(
     (config) => {
+        // Attach token
         const token =
             typeof window !== "undefined" ? localStorage.getItem("token") : null;
         if (token) {
             config.headers.Authorization = `Bearer ${token}`;
         }
+
+        // Cache-bust all GET requests so browser never serves stale 304s
+        if (config.method === "get" || config.method === "GET") {
+            config.params = {
+                ...config.params,
+                _t: Date.now(),
+            };
+        }
+
         return config;
     },
     (error) => Promise.reject(error)

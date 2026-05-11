@@ -2,20 +2,6 @@
 import { useState, useEffect } from "react";
 import api from "@/lib/axios";
 
-/**
- * ReviewQueue — expandable approve / reject / changes panel.
- * Used by Reviewer (stage 1) and Approver/COO (stage 2).
- *
- * Props:
- *  items: Array<{
- *    id, title, employee, department, type, submittedAt,
- *    stage1Reviewer?, fileUrl?
- *  }>
- *  onAction: (id, action, comment) => void
- *  stage?: 1 | 2
- *  title?: string
- */
-
 const ACTION_STYLES = {
     approve: "bg-emerald-600 hover:bg-emerald-700 text-white",
     changes: "bg-violet-600  hover:bg-violet-700  text-white",
@@ -46,15 +32,9 @@ function ReportModal({ reportId, title, onClose }) {
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
-            {/* Backdrop */}
-            <div
-                className="absolute inset-0 bg-black/40 backdrop-blur-sm"
-                onClick={onClose}
-            />
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
 
-            {/* Modal */}
             <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[85vh] flex flex-col">
-
                 {/* Header */}
                 <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
                     <div className="flex-1 min-w-0 pr-4">
@@ -76,17 +56,11 @@ function ReportModal({ reportId, title, onClose }) {
                 {/* Body */}
                 <div className="flex-1 overflow-y-auto px-6 py-5">
                     {loading ? (
-                        <div className="flex items-center justify-center h-40 text-gray-400 text-sm">
-                            Loading report…
-                        </div>
+                        <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading report…</div>
                     ) : error ? (
-                        <div className="text-center py-10">
-                            <p className="text-red-500 text-sm">{error}</p>
-                        </div>
+                        <div className="text-center py-10"><p className="text-red-500 text-sm">{error}</p></div>
                     ) : (
                         <div className="space-y-5">
-
-                            {/* Meta info */}
                             <div className="grid grid-cols-2 gap-3">
                                 {[
                                     { label: "Employee", value: report?.employee?.full_name ?? "—" },
@@ -94,14 +68,16 @@ function ReportModal({ reportId, title, onClose }) {
                                     { label: "Team", value: report?.employee?.team?.name ?? "—" },
                                     { label: "Schedule", value: report?.schedule?.title ?? "—" },
                                     {
-                                        label: "Submitted", value: report?.submitted_at
+                                        label: "Submitted",
+                                        value: report?.submitted_at
                                             ? new Date(report.submitted_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
-                                            : "Not submitted"
+                                            : "Not submitted",
                                     },
                                     {
-                                        label: "Status", value: report?.status
+                                        label: "Status",
+                                        value: report?.status
                                             ? report.status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
-                                            : "—"
+                                            : "—",
                                     },
                                 ].map(({ label, value }) => (
                                     <div key={label} className="bg-gray-50 rounded-xl px-4 py-3">
@@ -111,23 +87,17 @@ function ReportModal({ reportId, title, onClose }) {
                                 ))}
                             </div>
 
-                            {/* Report content */}
                             {report?.content && (
                                 <div>
-                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                                        Report Content
-                                    </p>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Report Content</p>
                                     <div className="bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
                                         {report.content}
                                     </div>
                                 </div>
                             )}
 
-                            {/* Attached file */}
                             <div>
-                                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                                    Attached File
-                                </p>
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Attached File</p>
                                 {report?.file_path ? (
                                     <a
                                         href={`${FILE_BASE_URL}${report.file_path}`}
@@ -143,15 +113,11 @@ function ReportModal({ reportId, title, onClose }) {
                                     </a>
                                 ) : (
                                     <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-dashed border-gray-200 rounded-xl">
-                                        <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                        </svg>
                                         <span className="text-sm text-gray-400">No file attached — this is a text report.</span>
                                     </div>
                                 )}
                             </div>
 
-                            {/* No content or file */}
                             {!report?.content && !report?.file_path && (
                                 <div className="text-center py-8 text-gray-400">
                                     <div className="text-3xl mb-2">📄</div>
@@ -159,12 +125,9 @@ function ReportModal({ reportId, title, onClose }) {
                                 </div>
                             )}
 
-                            {/* Previous review logs */}
                             {(report?.reviewLogs ?? []).length > 0 && (
                                 <div>
-                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
-                                        Review History
-                                    </p>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Review History</p>
                                     <div className="space-y-2">
                                         {report.reviewLogs.map((log) => (
                                             <div
@@ -186,9 +149,7 @@ function ReportModal({ reportId, title, onClose }) {
                                                         {log.action.replace("_", " ")}
                                                     </span>
                                                 </div>
-                                                {log.comment && (
-                                                    <p className="text-gray-500 leading-relaxed">{log.comment}</p>
-                                                )}
+                                                {log.comment && <p className="text-gray-500 leading-relaxed">{log.comment}</p>}
                                                 <p className="text-gray-400 mt-1">
                                                     {new Date(log.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
                                                 </p>
@@ -201,7 +162,6 @@ function ReportModal({ reportId, title, onClose }) {
                     )}
                 </div>
 
-                {/* Footer */}
                 <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
                     <button
                         onClick={onClose}
@@ -219,17 +179,34 @@ function ReportModal({ reportId, title, onClose }) {
 export default function ReviewQueue({ items = [], onAction, stage = 1, title }) {
     const [open, setOpen] = useState(null);
     const [comment, setComment] = useState("");
+    const [commentError, setCommentError] = useState(""); // FIX: visible error instead of silent return
     const [done, setDone] = useState(new Set());
     const [viewing, setViewing] = useState(null);
 
     const heading = title ?? `Stage ${stage} Review Queue`;
 
     function handleAction(id, action) {
-        if (!comment.trim() && action !== "approve") return;
-        onAction?.(id, action, comment);
+        // FIX: show error message instead of silently doing nothing
+        if (!comment.trim() && action !== "approve") {
+            setCommentError("A comment is required to reject or request changes.");
+            return;
+        }
+        setCommentError("");
+
+        // Backend actionMap accepts: "approve", "changes", "reject"
+        // "changes" maps to "changes_requested" on the backend — do NOT remap it
+        const apiAction = action;
+
+        onAction?.(id, apiAction, comment);
         setDone((d) => new Set([...d, id]));
         setOpen(null);
         setComment("");
+    }
+
+    function openPanel(itemId) {
+        setOpen(itemId);
+        setComment("");
+        setCommentError("");
     }
 
     const pending = items.filter((i) => !done.has(i.id));
@@ -263,13 +240,10 @@ export default function ReviewQueue({ items = [], onAction, stage = 1, title }) 
                             const isOpen = open === item.id;
                             return (
                                 <li key={item.id} className="transition-colors hover:bg-indigo-50/20">
-
                                     {/* Collapsed row */}
                                     <div className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                                         <div className="flex-1 min-w-0">
-                                            <p className="font-semibold text-sm text-[#0f1117] truncate">
-                                                {item.title}
-                                            </p>
+                                            <p className="font-semibold text-sm text-[#0f1117] truncate">{item.title}</p>
                                             <p className="text-xs text-gray-500 mt-0.5">
                                                 {item.employee} · {item.department} · {item.type}
                                                 {item.stage1Reviewer && (
@@ -283,7 +257,6 @@ export default function ReviewQueue({ items = [], onAction, stage = 1, title }) 
                                         <div className="flex items-center gap-2 shrink-0">
                                             <span className="text-xs text-gray-400">{item.submittedAt}</span>
 
-                                            {/* View report button */}
                                             <button
                                                 onClick={() => setViewing({ id: item.id, title: item.title })}
                                                 className="px-3 py-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-600 text-xs font-semibold border border-indigo-200 transition-colors flex items-center gap-1"
@@ -295,12 +268,8 @@ export default function ReviewQueue({ items = [], onAction, stage = 1, title }) 
                                                 View
                                             </button>
 
-                                            {/* Expand action panel */}
                                             <button
-                                                onClick={() => {
-                                                    setOpen(isOpen ? null : item.id);
-                                                    setComment("");
-                                                }}
+                                                onClick={() => isOpen ? setOpen(null) : openPanel(item.id)}
                                                 className="px-3 py-1.5 rounded-lg bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-semibold transition-colors"
                                             >
                                                 {isOpen ? "Cancel" : "Review →"}
@@ -335,9 +304,17 @@ export default function ReviewQueue({ items = [], onAction, stage = 1, title }) 
                                                     rows={3}
                                                     placeholder="Add your review comment…"
                                                     value={comment}
-                                                    onChange={(e) => setComment(e.target.value)}
-                                                    className="w-full border border-gray-200 rounded-xl text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none bg-white"
+                                                    onChange={(e) => {
+                                                        setComment(e.target.value);
+                                                        if (e.target.value.trim()) setCommentError("");
+                                                    }}
+                                                    className={`w-full border rounded-xl text-sm px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none bg-white ${commentError ? "border-rose-400" : "border-gray-200"
+                                                        }`}
                                                 />
+                                                {/* FIX: visible error message */}
+                                                {commentError && (
+                                                    <p className="text-xs text-rose-500 mt-1 font-medium">{commentError}</p>
+                                                )}
 
                                                 <div className="flex flex-wrap gap-2 mt-3">
                                                     <button
@@ -346,6 +323,7 @@ export default function ReviewQueue({ items = [], onAction, stage = 1, title }) 
                                                     >
                                                         ✓ Approve
                                                     </button>
+                                                    {/* FIX: action value stays "changes" here; handleAction maps it to "request_changes" */}
                                                     <button
                                                         onClick={() => handleAction(item.id, "changes")}
                                                         className={`px-4 py-2 rounded-xl text-xs font-bold transition-colors ${ACTION_STYLES.changes}`}
@@ -369,7 +347,6 @@ export default function ReviewQueue({ items = [], onAction, stage = 1, title }) 
                 )}
             </div>
 
-            {/* Report preview modal */}
             {viewing && (
                 <ReportModal
                     reportId={viewing.id}

@@ -8,13 +8,34 @@ import ReportForm from "@/components/reports/ReportForm";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/axios";
 
+// FIX: "submitted" must NOT map to "Pending" — it's its own status
 const STATUS_MAP = {
     pending: "Pending",
-    submitted: "Pending",
+    submitted: "Submitted",
     under_review: "Under Review",
     changes_requested: "Changes Requested",
     approved: "Approved",
     rejected: "Rejected",
+};
+
+// ── SVG Icons ────────────────────────────────────────────────────
+const Icon = ({ name, className = "w-5 h-5" }) => {
+    const p = { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 1.75, strokeLinecap: "round", strokeLinejoin: "round" };
+    const icons = {
+        // stat cards
+        reports: <svg className={className} {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>,
+        approved: <svg className={className} {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>,
+        pending: <svg className={className} {...p}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>,
+        changes: <svg className={className} {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>,
+        // banner
+        warning: <svg className={className} {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>,
+        // header greeting
+        wave: <svg className={className} {...p}><path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2" /><path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2" /><path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" /></svg>,
+        // empty state
+        inbox: <svg className={className} {...p}><polyline points="22 12 16 12 14 15 10 15 8 12 2 12" /><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>,
+        plus: <svg className={className} {...p}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
+    };
+    return icons[name] ?? null;
 };
 
 function normalizeReport(r) {
@@ -69,7 +90,6 @@ export default function EmployeeDashboard() {
 
             const rawReports = reportsRes.data.reports ?? reportsRes.data ?? [];
             const rawSchedules = schedulesRes.data.schedules ?? schedulesRes.data ?? [];
-
             const normalized = rawReports.map(normalizeReport);
             setReports(normalized);
 
@@ -103,11 +123,13 @@ export default function EmployeeDashboard() {
         changes: reports.filter(r => r.status === "Changes Requested").length,
     };
 
+    // Stats use SVG icon names — StatsGrid must accept { icon } as a string key
+    // If your StatsGrid renders r.icon directly as JSX, pass the element instead (see below)
     const stats = [
-        { label: "Total Reports", value: counts.total, icon: "📋", color: "indigo" },
-        { label: "Approved", value: counts.approved, icon: "✅", color: "emerald" },
-        { label: "Pending", value: counts.pending, icon: "⏳", color: "amber" },
-        { label: "Needs Changes", value: counts.changes, icon: "✏️", color: "rose" },
+        { label: "Total Reports", value: counts.total, iconEl: <Icon name="reports" className="w-5 h-5" />, color: "indigo" },
+        { label: "Approved", value: counts.approved, iconEl: <Icon name="approved" className="w-5 h-5" />, color: "emerald" },
+        { label: "Pending", value: counts.pending, iconEl: <Icon name="pending" className="w-5 h-5" />, color: "amber" },
+        { label: "Needs Changes", value: counts.changes, iconEl: <Icon name="changes" className="w-5 h-5" />, color: "rose" },
     ];
 
     const tableReports = reports.slice(0, 5).map(r => ({
@@ -121,13 +143,14 @@ export default function EmployeeDashboard() {
     }));
 
     const nextDue = schedules.find(s => !s.submitted);
-    const overdueCount = reports.filter(r => r.is_late && r.status !== "approved").length;
+    const overdueCount = reports.filter(r => r.is_late && r.status !== "Approved").length;
 
     const activities = reports.slice(0, 6).map(r => {
         const typeMap = {
             "Approved": { type: "approved", message: "Your report was approved" },
             "Changes Requested": { type: "changes", message: "Changes requested on" },
             "Pending": { type: "submitted", message: "Pending submission:" },
+            "Submitted": { type: "submitted", message: "Submitted for review:" },
             "Under Review": { type: "submitted", message: "Under review:" },
             "Rejected": { type: "changes", message: "Report rejected:" },
         };
@@ -141,8 +164,6 @@ export default function EmployeeDashboard() {
         };
     });
 
-    // ── Single-step submit: FormData goes straight to POST /reports
-    // The controller now sets status='submitted' on create, so no PATCH needed.
     async function handleFormSubmit(formData) {
         await api.post("/reports", formData, {
             headers: { "Content-Type": "multipart/form-data" },
@@ -173,19 +194,20 @@ export default function EmployeeDashboard() {
 
             <div className="relative z-10 max-w-6xl mx-auto px-6 py-8">
 
-                {/* Header */}
+                {/* ── Header ──────────────────────────────────────── */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <p className="text-sm text-gray-500 mb-1">Welcome back 👋 {firstName}</p>
+                        <p className="text-sm text-gray-500 mb-1 flex items-center gap-1.5">
+                            <Icon name="wave" className="w-4 h-4 text-amber-400" />
+                            Welcome back, {firstName}
+                        </p>
                         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">My Dashboard</h1>
                     </div>
                     <button
                         onClick={() => { setPrefill(null); setShowForm(true); }}
                         className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-indigo-200"
                     >
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                        </svg>
+                        <Icon name="plus" className="w-4 h-4" />
                         Submit Report
                     </button>
                 </div>
@@ -199,14 +221,18 @@ export default function EmployeeDashboard() {
                     </div>
                 ) : (
                     <>
+                        {/* ── Stats ───────────────────────────────────── */}
                         <div className="mb-6">
                             <StatsGrid stats={stats} cols={4} />
                         </div>
 
+                        {/* ── Overdue / Upcoming Banner ────────────────── */}
                         {(overdueCount > 0 || nextDue) && (
                             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-center gap-3">
-                                <span className="text-xl">⚠️</span>
-                                <div className="flex-1">
+                                <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                    <Icon name="warning" className="w-4 h-4 text-amber-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
                                     {overdueCount > 0 ? (
                                         <>
                                             <p className="text-sm font-bold text-amber-800">
@@ -216,28 +242,29 @@ export default function EmployeeDashboard() {
                                         </>
                                     ) : nextDue ? (
                                         <>
-                                            <p className="text-sm font-bold text-amber-800">
-                                                Upcoming: {nextDue.reportType}
-                                            </p>
+                                            <p className="text-sm font-bold text-amber-800">Upcoming: {nextDue.reportType}</p>
                                             <p className="text-xs text-amber-600">Due {new Date(nextDue.dueDate).toLocaleDateString()}</p>
                                         </>
                                     ) : null}
                                 </div>
                                 <button
                                     onClick={() => { setPrefill(null); setShowForm(true); }}
-                                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors"
+                                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors flex-shrink-0"
                                 >
                                     Submit Now
                                 </button>
                             </div>
                         )}
 
+                        {/* ── Main Grid ───────────────────────────────── */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                             <div className="lg:col-span-2">
                                 {tableReports.length === 0 ? (
                                     <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center text-gray-400">
-                                        <div className="text-4xl mb-3">📭</div>
-                                        <p className="font-medium">No reports yet</p>
+                                        <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-4">
+                                            <Icon name="inbox" className="w-7 h-7 text-gray-300" />
+                                        </div>
+                                        <p className="font-medium text-gray-500">No reports yet</p>
                                         <p className="text-sm mt-1">Submit your first report to get started.</p>
                                     </div>
                                 ) : (

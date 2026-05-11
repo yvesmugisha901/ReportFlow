@@ -7,9 +7,12 @@ import ReportTable from "@/components/dashboard/ReportTable";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/axios";
 
+// FIX: "submitted" must map to its OWN label, NOT "Pending".
+// Mapping both "pending" and "submitted" to "Pending" caused newly submitted
+// reports to be counted in the Pending bucket, inflating the overdue count.
 const STATUS_MAP = {
     pending: "Pending",
-    submitted: "Pending",
+    submitted: "Submitted",   // ← was incorrectly "Pending" before
     under_review: "Under Review",
     changes_requested: "Changes Requested",
     approved: "Approved",
@@ -76,7 +79,8 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, "-");
 }
 
-const ALL_STATUSES = ["All", "Pending", "Under Review", "Approved", "Changes Requested", "Rejected"];
+// FIX: "Submitted" is now its own status tab, not lumped into "Pending"
+const ALL_STATUSES = ["All", "Pending", "Submitted", "Under Review", "Approved", "Changes Requested", "Rejected"];
 
 export default function EmployeeReportsPage() {
     const { user } = useAuth();
@@ -131,18 +135,14 @@ export default function EmployeeReportsPage() {
         setShowForm(true);
     }
 
-    // ── Submit handler — single step only, no double PATCH ───
     async function handleFormSubmit(formData) {
         try {
             if (resubmitReport) {
-                // For resubmit after changes_requested: update the existing report
-                // then flip it back to submitted via the submit endpoint
                 await api.put(`/reports/${resubmitReport.id}`, formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
                 await api.patch(`/reports/${resubmitReport.id}/submit`);
             } else {
-                // New report: POST creates and auto-submits in one step (status='submitted' on create)
                 await api.post("/reports", formData, {
                     headers: { "Content-Type": "multipart/form-data" },
                 });
@@ -152,7 +152,7 @@ export default function EmployeeReportsPage() {
             load();
         } catch (err) {
             console.error("Submit failed:", err);
-            throw err; // re-throw so ReportForm shows the error
+            throw err;
         }
     }
 
@@ -203,16 +203,19 @@ export default function EmployeeReportsPage() {
                             >
                                 All ({reports.length})
                             </button>
-                            {Object.entries(counts).map(([status, count]) => (
-                                <button
-                                    key={status}
-                                    onClick={() => setStatus(status)}
-                                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === status
-                                        ? "bg-indigo-600 text-white"
-                                        : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"}`}
-                                >
-                                    {status} ({count})
-                                </button>
+                            {ALL_STATUSES.slice(1).map((status) => (
+                                // Only show tabs that have at least 1 report, to avoid clutter
+                                counts[status] > 0 && (
+                                    <button
+                                        key={status}
+                                        onClick={() => setStatus(status)}
+                                        className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === status
+                                            ? "bg-indigo-600 text-white"
+                                            : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"}`}
+                                    >
+                                        {status} ({counts[status]})
+                                    </button>
+                                )
                             ))}
                         </div>
 
