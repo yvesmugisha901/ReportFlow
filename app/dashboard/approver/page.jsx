@@ -165,7 +165,6 @@ function ReportModal({ reportId, title, onClose }) {
                             {/* No content or file */}
                             {!report?.content && !report?.file_path && (
                                 <div className="text-center py-8 text-gray-400">
-                                    <div className="text-3xl mb-2">📄</div>
                                     <p className="text-sm">No content or file attached to this report.</p>
                                 </div>
                             )}
@@ -271,7 +270,7 @@ export default function ApproverDashboard() {
         {
             label: "Awaiting Sign-off",
             value: pendingReports.length,
-            icon: "⏳",
+            icon: "hourglass",
             color: "amber",
             trend: "stage 2 queue",
             trendUp: pendingReports.length === 0,
@@ -279,7 +278,7 @@ export default function ApproverDashboard() {
         {
             label: "Approved",
             value: dashStats?.approvedReports ?? 0,
-            icon: "✅",
+            icon: "approved",
             color: "emerald",
             trend: `${dashStats?.approvedThisWeek ?? 0} this week`,
             trendUp: true,
@@ -287,7 +286,7 @@ export default function ApproverDashboard() {
         {
             label: "Total Reports",
             value: dashStats?.totalReports ?? allReports.length,
-            icon: "📋",
+            icon: "reports",
             color: "indigo",
             trend: `${dashStats?.reportsThisMonth ?? 0} this month`,
             trendUp: true,
@@ -295,7 +294,7 @@ export default function ApproverDashboard() {
         {
             label: "Compliance Rate",
             value: `${Math.round(dashStats?.complianceRate ?? 0)}%`,
-            icon: "📊",
+            icon: "compliance",
             color: "violet",
             trend: dashStats?.complianceRateDelta != null
                 ? `${dashStats.complianceRateDelta > 0 ? "+" : ""}${dashStats.complianceRateDelta}% vs last month`
@@ -403,7 +402,6 @@ export default function ApproverDashboard() {
                 )}
             </div>
 
-            {/* Report modal triggered from the table */}
             {viewing && (
                 <ReportModal
                     reportId={viewing.id}

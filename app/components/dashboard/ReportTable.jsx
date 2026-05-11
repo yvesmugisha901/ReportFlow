@@ -1,23 +1,6 @@
 "use client";
 import { useState } from "react";
 
-/**
- * ReportTable — sortable, filterable reports list used across all dashboards.
- *
- * Props:
- *  reports: Array<{
- *    id: number | string,
- *    title: string,
- *    employee: string,
- *    department: string,
- *    type: string,
- *    submittedAt: string,     // formatted date string
- *    status: "Pending" | "Under Review" | "Approved" | "Rejected" | "Changes Requested"
- *  }>
- *  showEmployee?: boolean     // hide for employee's own table (default true)
- *  onView?: (report) => void  // click handler for a row
- */
-
 const STATUS_COLORS = {
     Pending: "bg-amber-100 text-amber-700",
     "Under Review": "bg-sky-100 text-sky-700",
@@ -27,6 +10,45 @@ const STATUS_COLORS = {
 };
 
 const ALL_STATUSES = ["All", "Pending", "Under Review", "Approved", "Rejected", "Changes Requested"];
+
+// ── Icons ────────────────────────────────────────────────────────
+const Icon = ({ name, className = "w-4 h-4" }) => {
+    const p = {
+        fill: "none",
+        viewBox: "0 0 24 24",
+        stroke: "currentColor",
+        strokeWidth: 1.8,
+        strokeLinecap: "round",
+        strokeLinejoin: "round",
+    };
+    const icons = {
+        search: (
+            <svg className={className} {...p}>
+                <circle cx="11" cy="11" r="8" />
+                <line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+        ),
+        arrowUp: (
+            <svg className={className} {...p}>
+                <line x1="12" y1="19" x2="12" y2="5" />
+                <polyline points="5 12 12 5 19 12" />
+            </svg>
+        ),
+        arrowDown: (
+            <svg className={className} {...p}>
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <polyline points="19 12 12 19 5 12" />
+            </svg>
+        ),
+        arrowRight: (
+            <svg className={className} {...p}>
+                <line x1="5" y1="12" x2="19" y2="12" />
+                <polyline points="12 5 19 12 12 19" />
+            </svg>
+        ),
+    };
+    return icons[name] ?? null;
+};
 
 export default function ReportTable({
     reports = [],
@@ -62,7 +84,15 @@ export default function ReportTable({
             className={`px-4 py-3 text-left text-xs font-semibold text-[#6b7280] uppercase tracking-wide ${sortable ? "cursor-pointer select-none hover:text-indigo-600" : ""}`}
             onClick={sortable ? () => toggleSort(k) : undefined}
         >
-            {label} {sortable && sortKey === k && (sortAsc ? "↑" : "↓")}
+            <span className="inline-flex items-center gap-1">
+                {label}
+                {sortable && sortKey === k && (
+                    <Icon
+                        name={sortAsc ? "arrowUp" : "arrowDown"}
+                        className="w-3 h-3"
+                    />
+                )}
+            </span>
         </th>
     );
 
@@ -72,13 +102,15 @@ export default function ReportTable({
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 border-b border-gray-100">
                 {/* search */}
                 <div className="relative flex-1">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                        <Icon name="search" className="w-4 h-4" />
+                    </span>
                     <input
                         type="text"
                         placeholder="Search reports…"
                         value={search}
                         onChange={(e) => setSearch(e.target.value)}
-                        className="w-full pl-8 pr-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                        className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
                     />
                 </div>
 
@@ -141,9 +173,9 @@ export default function ReportTable({
                                         {onView && (
                                             <button
                                                 onClick={() => onView(r)}
-                                                className="text-xs text-indigo-600 font-semibold hover:underline"
+                                                className="inline-flex items-center gap-1 text-xs text-indigo-600 font-semibold hover:underline"
                                             >
-                                                View →
+                                                View <Icon name="arrowRight" className="w-3 h-3" />
                                             </button>
                                         )}
                                     </td>

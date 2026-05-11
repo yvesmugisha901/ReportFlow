@@ -31,7 +31,7 @@ const Icon = ({ name, className = "w-5 h-5" }) => {
         refresh: <svg className={className} {...p}><polyline points="23 4 23 10 17 10" /><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10" /></svg>,
         spinner: <svg className={className} fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>,
         user: <svg className={className} {...p}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>,
-        eye: <svg className={className} {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>,
+        shield: <svg className={className} {...p}><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /></svg>,
     };
     return icons[name] ?? null;
 };
@@ -239,7 +239,7 @@ export default function AdminDashboard() {
     const [pendingUsers, setPendingUsers] = useState([]);
     const [pendingLoading, setPendingLoading] = useState(true);
     const [selectedUser, setSelectedUser] = useState(null);
-    const [viewingReport, setViewingReport] = useState(null); // FIX: report preview state
+    const [viewingReport, setViewingReport] = useState(null);
     const [toast, setToast] = useState("");
 
     useEffect(() => {
@@ -273,14 +273,7 @@ export default function AdminDashboard() {
         { label: "Approved", value: String(dashData.approvedReports ?? 0), icon: "approved", trend: `${dashData.approvedThisWeek ?? 0} this week`, trendUp: true, color: "emerald" },
         { label: "Departments", value: String(dashData.totalDepartments ?? 0), icon: "departments", trend: "All active", trendUp: true, color: "sky" },
         { label: "Employees", value: String(dashData.totalEmployees ?? 0), icon: "employees", trend: `${dashData.newEmployeesThisMonth ?? 0} new`, trendUp: true, color: "violet" },
-        {
-            label: "Compliance Rate",
-            value: dashData.complianceRate != null ? `${Math.round(dashData.complianceRate)}%` : "—",
-            icon: "compliance",
-            trend: dashData.complianceRateDelta != null ? `${dashData.complianceRateDelta > 0 ? "+" : ""}${dashData.complianceRateDelta}% vs last month` : "—",
-            trendUp: (dashData.complianceRateDelta ?? 0) >= 0,
-            color: "rose",
-        },
+        { label: "Compliance Rate", value: dashData.complianceRate != null ? `${Math.round(dashData.complianceRate)}%` : "—", icon: "compliance", trend: dashData.complianceRateDelta != null ? `${dashData.complianceRateDelta > 0 ? "+" : ""}${dashData.complianceRateDelta}% vs last month` : "—", trendUp: (dashData.complianceRateDelta ?? 0) >= 0, color: "rose" },
     ] : [];
 
     const recentReports = (dashData?.recentReports ?? []).map(normalizeReport);
@@ -298,6 +291,7 @@ export default function AdminDashboard() {
         { label: "All Reports", href: "/dashboard/admin/reports", icon: "allreports" },
     ];
 
+
     return (
         <div className="min-h-full bg-[#f8f9fc] text-[#0f1117]">
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
@@ -306,14 +300,20 @@ export default function AdminDashboard() {
             </div>
 
             <div className="relative z-10 px-6 py-8">
-                {/* Header */}
+
+                {/* ── Header ───────────────────────────────────────── */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <p className="text-sm text-gray-500 mb-0.5">Hey 👋 {user?.full_name?.split(" ")[0] ?? "Admin"}</p>
-                        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Overview</h1>
+                        <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-1">
+                            <Icon name="shield" className="w-3 h-3" />
+                            System Administrator
+                        </span>
+                        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Admin Dashboard</h1>
                     </div>
-                    <Link href="/dashboard/admin/employees/new"
-                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-indigo-200">
+                    <Link
+                        href="/dashboard/admin/employees/new"
+                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-indigo-200"
+                    >
                         <Icon name="user" className="w-4 h-4" />
                         Add Employee
                     </Link>
@@ -330,7 +330,7 @@ export default function AdminDashboard() {
                     <>
                         <div className="mb-6"><StatsGrid stats={stats} cols={4} /></div>
 
-                        {/* Quick links — SVG icons replacing emojis */}
+                        {/* Quick links */}
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
                             {quickLinks.map(a => (
                                 <Link key={a.label} href={a.href}
@@ -420,7 +420,6 @@ export default function AdminDashboard() {
                                         <p className="font-medium">No recent reports</p>
                                     </div>
                                 ) : (
-                                    // FIX: onView now opens the ReportModal instead of console.log
                                     <ReportTable
                                         reports={recentReports}
                                         showEmployee={true}
@@ -434,17 +433,14 @@ export default function AdminDashboard() {
                 )}
             </div>
 
-            {/* Approve Modal */}
             {selectedUser && (
                 <ApproveModal user={selectedUser} onClose={() => setSelectedUser(null)} onApproved={handleApproved} />
             )}
 
-            {/* FIX: Report preview modal */}
             {viewingReport && (
                 <ReportModal reportId={viewingReport.id} title={viewingReport.title} onClose={() => setViewingReport(null)} />
             )}
 
-            {/* Toast */}
             {toast && (
                 <div className="fixed bottom-6 right-6 z-50 flex items-center gap-2.5 px-4 py-3 bg-gray-900 text-white text-sm font-medium rounded-xl shadow-xl">
                     <Icon name="approved" className="w-4 h-4 text-emerald-400" />

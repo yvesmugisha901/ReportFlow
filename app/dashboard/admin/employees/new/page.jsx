@@ -138,7 +138,6 @@ export default function NewEmployeePage() {
                     >
                         ← Back
                     </button>
-                    <p className="text-sm text-gray-500 mb-1">Admin / Employees / New</p>
                     <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Add Employee</h1>
                     <p className="text-sm text-gray-400 mt-1">A temporary password will be auto-generated and shown to you after creation.</p>
                 </div>

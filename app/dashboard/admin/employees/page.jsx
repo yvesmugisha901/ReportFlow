@@ -43,14 +43,15 @@ export default function EmployeesPage() {
     const [deptFilter, setDeptFilter] = useState("");
     const [togglingId, setTogglingId] = useState(null);
 
-    const load = useCallback(async () => {
+    // ── load accepts params directly to avoid stale-closure issues ──
+    const load = useCallback(async (currentSearch, currentRole, currentDept) => {
         try {
             setLoading(true);
             const [userData, deptData] = await Promise.all([
                 getUsers({
-                    search: search || undefined,
-                    role: roleFilter || undefined,
-                    dept_id: deptFilter || undefined,
+                    search: currentSearch || undefined,
+                    role: currentRole || undefined,
+                    dept_id: currentDept || undefined,
                 }),
                 getDepartments(),
             ]);
@@ -61,9 +62,13 @@ export default function EmployeesPage() {
         } finally {
             setLoading(false);
         }
-    }, [search, roleFilter, deptFilter]);
+    }, []);
 
-    useEffect(() => { load(); }, [load]);
+    // ── Re-fetch whenever any filter changes (dept filter fix) ──
+    useEffect(() => {
+        load(search, roleFilter, deptFilter);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search, roleFilter, deptFilter]);
 
     const handleToggleStatus = async (user) => {
         const action = user.is_active ? "Deactivate" : "Activate";
@@ -72,13 +77,17 @@ export default function EmployeesPage() {
         try {
             if (user.is_active) await deactivateUser(user.user_id);
             else await activateUser(user.user_id);
-            await load();
+            await load(search, roleFilter, deptFilter);
         } catch {
             alert(`Failed to ${action.toLowerCase()} user.`);
         } finally {
             setTogglingId(null);
         }
     };
+
+    // ── Resolve the correct ID field defensively ──
+    // Some APIs return `id` instead of `user_id`; this handles both.
+    const getUserId = (u) => u.user_id ?? u.id;
 
     return (
         <div className="min-h-screen bg-[#f5f6fa] text-[#0f1117]">
@@ -189,11 +198,12 @@ export default function EmployeesPage() {
                                 <tbody className="divide-y divide-gray-50">
                                     {users.map((u) => {
                                         const role = ROLE_STYLES[u.role] ?? { bg: "bg-gray-100", text: "text-gray-600", label: u.role };
-                                        const avatarColor = AVATAR_COLORS[u.user_id % AVATAR_COLORS.length];
-                                        const toggling = togglingId === u.user_id;
+                                        const uid = getUserId(u);
+                                        const avatarColor = AVATAR_COLORS[uid % AVATAR_COLORS.length];
+                                        const toggling = togglingId === uid;
 
                                         return (
-                                            <tr key={u.user_id} className="hover:bg-gray-50/60 transition-colors">
+                                            <tr key={uid} className="hover:bg-gray-50/60 transition-colors">
 
                                                 {/* Name */}
                                                 <td className="px-4 py-3 whitespace-nowrap">
@@ -239,19 +249,23 @@ export default function EmployeesPage() {
                                                 {/* Actions */}
                                                 <td className="px-4 py-3 whitespace-nowrap">
                                                     <div className="flex items-center gap-1.5">
-                                                        {/* Edit */}
-                                                        <Link
-                                                            href={`/dashboard/admin/employees/${u.user_id}/edit`}
-                                                            className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-md border border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors font-medium"
-                                                        >
-                                                            <Icon name="edit" className="w-3 h-3" />
-                                                            Edit
-                                                        </Link>
+                                                        {/* Edit — use uid resolved above */}
+                                                        {uid ? (
+                                                            <Link
+                                                                href={`/dashboard/admin/employees/${uid}/edit`}
+                                                                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-md border border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors font-medium"
+                                                            >
+                                                                <Icon name="edit" className="w-3 h-3" />
+                                                                Edit
+                                                            </Link>
+                                                        ) : (
+                                                            <span className="text-[11px] px-2.5 py-1 text-gray-300">No ID</span>
+                                                        )}
 
                                                         {/* Activate / Deactivate */}
                                                         <button
                                                             type="button"
-                                                            onClick={() => handleToggleStatus(u)}
+                                                            onClick={() => handleToggleStatus({ ...u, user_id: uid })}
                                                             disabled={toggling}
                                                             className={`inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-md border font-medium transition-colors disabled:opacity-40 ${u.is_active
                                                                 ? "border-gray-200 text-gray-600 hover:border-red-300 hover:text-red-600 hover:bg-red-50/50"

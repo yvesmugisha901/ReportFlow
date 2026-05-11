@@ -157,15 +157,18 @@ export default function AdminReportsPage() {
     const [totalPages, setTotalPages] = useState(1);
     const [preview, setPreview] = useState(null);
 
-    const load = useCallback(async () => {
+    // ── Load reports ─────────────────────────────────────────────
+    // NOTE: `load` is intentionally NOT wrapped in useCallback so it
+    // always reads the latest state values directly from the closure.
+    const load = useCallback(async (currentPage, currentSearch, currentStatus, currentDept) => {
         try {
             setLoading(true);
             const res = await api.get("/reports", {
                 params: {
-                    search: search || undefined,
-                    status: statusFilter || undefined,
-                    dept_id: deptFilter || undefined,
-                    page,
+                    search: currentSearch || undefined,
+                    status: currentStatus || undefined,
+                    dept_id: currentDept || undefined,
+                    page: currentPage,
                     limit: 15,
                 },
             });
@@ -177,7 +180,7 @@ export default function AdminReportsPage() {
         } finally {
             setLoading(false);
         }
-    }, [search, statusFilter, deptFilter, page]);
+    }, []);
 
     // Load departments once
     useEffect(() => {
@@ -186,8 +189,20 @@ export default function AdminReportsPage() {
             .catch(() => { });
     }, []);
 
-    useEffect(() => { setPage(1); }, [search, statusFilter, deptFilter]);
-    useEffect(() => { load(); }, [load]);
+    // ── FIX: When filters change, reset to page 1 and fetch immediately ──
+    // By passing values directly to load() we avoid the stale-closure /
+    // double-render race that caused the department filter to be ignored.
+    useEffect(() => {
+        setPage(1);
+        load(1, search, statusFilter, deptFilter);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [search, statusFilter, deptFilter]);
+
+    // ── When only the page changes (prev/next buttons), re-fetch ──
+    useEffect(() => {
+        load(page, search, statusFilter, deptFilter);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [page]);
 
     return (
         <>

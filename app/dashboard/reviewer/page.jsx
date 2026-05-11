@@ -47,7 +47,7 @@ export default function ReviewerDashboard() {
     const [recentLogs, setRecentLogs] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [actioning, setActioning] = useState(null); // report id being acted on
+    const [actioning, setActioning] = useState(null);
 
     const load = useCallback(async () => {
         try {
@@ -56,12 +56,11 @@ export default function ReviewerDashboard() {
 
             const [pendingRes, allRes] = await Promise.all([
                 api.get("/reviews/pending"),
-                api.get("/reports"),           // get all dept reports for "recently reviewed"
+                api.get("/reports"),
             ]);
 
             setPending((pendingRes.data.reports ?? []).map(normalizeReport));
 
-            // Build "recently reviewed" from reports that are no longer submitted
             const reviewed = (allRes.data.reports ?? [])
                 .filter(r => ['under_review', 'approved', 'rejected', 'changes_requested'].includes(r.status))
                 .slice(0, 5)
@@ -87,7 +86,6 @@ export default function ReviewerDashboard() {
         setActioning(id);
         try {
             await api.post(`/reviews/${id}`, { action, comment });
-            // Optimistically remove from queue, then refresh
             setPending(prev => prev.filter(r => r.id !== id));
             load();
         } catch (err) {
@@ -99,13 +97,12 @@ export default function ReviewerDashboard() {
     }
 
     const stats = [
-        { label: "Awaiting Review", value: pendingReports.length, icon: "⏳", color: "amber" },
-        { label: "Reviewed", value: recentLogs.length, icon: "✅", color: "emerald" },
-        { label: "Dept. Submitted", value: pendingReports.length + recentLogs.length, icon: "📤", color: "indigo" },
-        { label: "Dept. Approved", value: recentLogs.filter(r => r.action === "approved").length, icon: "📊", color: "violet" },
+        { label: "Awaiting Review", value: pendingReports.length, icon: "hourglass", color: "amber" },
+        { label: "Reviewed", value: recentLogs.length, icon: "approved", color: "emerald" },
+        { label: "Dept. Submitted", value: pendingReports.length + recentLogs.length, icon: "inbox", color: "indigo" },
+        { label: "Dept. Approved", value: recentLogs.filter(r => r.action === "approved").length, icon: "chart", color: "violet" },
     ];
 
-    // Compliance data from reports
     const deptName = user?.department?.name ?? "Your Department";
     const total = pendingReports.length + recentLogs.length;
     const submitted = recentLogs.length;
@@ -127,7 +124,7 @@ export default function ReviewerDashboard() {
                     <div>
                         <p className="text-sm text-gray-500 mb-1">Stage 1 Review 🔍 — {deptName}</p>
                         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
-                            Hey {firstName}, here's your queue
+                            Hey {firstName}, here&apos;s your queue
                         </h1>
                     </div>
                 </div>

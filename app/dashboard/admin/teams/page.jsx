@@ -134,14 +134,15 @@ export default function TeamsPage() {
                 {/* Department filter — FIX: now correctly triggers re-fetch via useCallback */}
                 <div className="flex items-center gap-3 mb-6">
                     <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                        <Icon name="filter" className="w-3.5 h-3.5" />
                         Filter
                     </div>
                     <select
+
                         className="border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm"
                         value={filterDept}
                         onChange={e => setFilterDept(e.target.value)}
                     >
+                        <Icon name="filter" className="w-3.5 h-3.5" />
                         <option value="">All Departments</option>
                         {departments.map(d => (
                             <option key={d.dept_id} value={d.dept_id}>{d.name}</option>

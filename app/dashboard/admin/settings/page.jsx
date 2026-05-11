@@ -58,7 +58,6 @@ export default function AdminSettingsPage() {
             <div className="max-w-2xl mx-auto px-6 py-8 flex flex-col gap-6">
 
                 <div className="mb-2">
-                    <p className="text-sm text-gray-500 mb-1">Admin · Account</p>
                     <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Settings</h1>
                 </div>
 
