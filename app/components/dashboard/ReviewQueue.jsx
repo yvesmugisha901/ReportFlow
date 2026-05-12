@@ -230,7 +230,6 @@ export default function ReviewQueue({ items = [], onAction, stage = 1, title }) 
                 {/* List */}
                 {pending.length === 0 ? (
                     <div className="text-center py-14 text-gray-400">
-                        <div className="text-4xl mb-2"></div>
                         <p className="text-sm font-medium">All caught up!</p>
                         <p className="text-xs mt-1">No pending items in this queue.</p>
                     </div>
