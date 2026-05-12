@@ -325,11 +325,11 @@ export default function ApproverDashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <p className="text-sm text-gray-500 mb-1">Final Stage Approvals ✅</p>
+                        <p className="text-sm text-gray-500 mb-1">Final Stage Approvals </p>
                         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
                             Hey {firstName} —{" "}
                             {pendingReports.length === 0
-                                ? "all reports signed off 🎉"
+                                ? "all reports signed off "
                                 : `${pendingReports.length} awaiting your sign-off`}
                         </h1>
                     </div>

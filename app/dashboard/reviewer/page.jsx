@@ -122,7 +122,7 @@ export default function ReviewerDashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <p className="text-sm text-gray-500 mb-1">Stage 1 Review 🔍 — {deptName}</p>
+                        <p className="text-sm text-gray-500 mb-1">Stage 1 Review </p>
                         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
                             Hey {firstName}, here&apos;s your queue
                         </h1>
