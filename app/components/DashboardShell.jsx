@@ -61,8 +61,8 @@ const Icon = ({ name }) => {
         case "check-circle": return <svg {...S}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>;
         case "logout": return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" /><polyline points="16 17 21 12 16 7" /><line x1="21" y1="12" x2="9" y2="12" /></svg>;
         case "menu": return <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" /></svg>;
-        case "chevronLeft": return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6" /></svg>;
-        case "chevronRight": return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6" /></svg>;
+        case "sidebarCollapse": return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M14 9l-3 3 3 3" /></svg>;
+        case "sidebarExpand": return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" /><path d="M9 3v18" /><path d="M12 9l3 3-3 3" /></svg>;
         default: return <svg {...S}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>;
     }
 };
@@ -159,7 +159,29 @@ const GLOBAL_STYLE = `
 }
 .rf-sidebar.collapsed .rf-active-dot { opacity: 0; }
 .rf-nav-divider { height: 1px; background: var(--rf-border-light); margin: 6px 2px; flex-shrink: 0; }
-.rf-user-footer { padding: 10px 8px; border-top: 1px solid var(--rf-border-light); flex-shrink: 0; }
+
+/* ── Sidebar collapse footer ─────────────────────────────────────── */
+.rf-sidebar-collapse-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 8px 10px; border-top: 1px solid var(--rf-border-light);
+    flex-shrink: 0; overflow: hidden; white-space: nowrap; gap: 8px;
+}
+.rf-collapse-label {
+    font-size: 11.5px; color: var(--rf-text-muted); font-weight: 450;
+    opacity: 1; transition: opacity var(--rf-transition); user-select: none;
+    letter-spacing: .1px;
+}
+.rf-sidebar.collapsed .rf-collapse-label { opacity: 0; pointer-events: none; width: 0; }
+.rf-collapse-btn {
+    width: 28px; height: 28px; border-radius: var(--rf-radius-sm); border: none;
+    background: transparent; color: var(--rf-text-muted); display: flex;
+    align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0;
+    transition: background var(--rf-transition), color var(--rf-transition);
+}
+.rf-collapse-btn:hover { background: var(--rf-border-light); color: var(--rf-text-primary); }
+
+/* ── User footer ─────────────────────────────────────────────────── */
+.rf-user-footer { padding: 8px 8px 10px; flex-shrink: 0; }
 .rf-user-card {
     display: flex; align-items: center; gap: 9px; padding: 8px 10px;
     border-radius: var(--rf-radius-md); overflow: hidden; white-space: nowrap;
@@ -183,6 +205,8 @@ const GLOBAL_STYLE = `
 }
 .rf-logout-btn:hover { background: #fee2e2; color: #dc2626; }
 .rf-sidebar.collapsed .rf-logout-btn { opacity: 0; pointer-events: none; }
+
+/* ── Main area ───────────────────────────────────────────────────── */
 .rf-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .rf-topbar {
     display: flex; align-items: center; justify-content: space-between;
@@ -193,15 +217,7 @@ const GLOBAL_STYLE = `
 .rf-topbar-left { display: flex; align-items: center; gap: 8px; }
 .rf-topbar-right { display: flex; align-items: center; gap: 6px; }
 .rf-breadcrumb { display: flex; align-items: center; gap: 5px; }
-.rf-breadcrumb-sep { color: var(--rf-text-muted); font-size: 13px; }
 .rf-breadcrumb-page { font-size: 13.5px; font-weight: 500; color: var(--rf-text-primary); letter-spacing: -.1px; }
-.rf-toggle-btn {
-    width: 30px; height: 30px; border-radius: var(--rf-radius-sm); border: none;
-    background: transparent; color: var(--rf-text-muted);
-    display: flex; align-items: center; justify-content: center; cursor: pointer;
-    transition: background var(--rf-transition), color var(--rf-transition);
-}
-.rf-toggle-btn:hover { background: var(--rf-hover); color: var(--rf-text-primary); }
 .rf-hamburger {
     width: 32px; height: 32px; border-radius: var(--rf-radius-sm); border: none;
     background: transparent; display: flex; align-items: center; justify-content: center;
@@ -278,7 +294,6 @@ export default function DashboardShell({ children }) {
         if (urlRole && urlRole !== user.role) refreshUser();
     }, [user, pathname, refreshUser]);
 
-    /* ── Notification count fetcher (memoized so we can call it on demand) ── */
     const fetchNotifCount = useCallback(async () => {
         try {
             const { default: api } = await import("@/lib/axios");
@@ -287,7 +302,6 @@ export default function DashboardShell({ children }) {
         } catch { }
     }, []);
 
-    /* ── Badge counts ── */
     useEffect(() => {
         if (role === "admin") {
             const fetchPending = async () => {
@@ -300,7 +314,6 @@ export default function DashboardShell({ children }) {
             const t = setInterval(fetchPending, 60000);
             return () => clearInterval(t);
         }
-
         if (role === "reviewer" || role === "approver") {
             const fetchQueue = async () => {
                 try {
@@ -313,26 +326,19 @@ export default function DashboardShell({ children }) {
             const t = setInterval(fetchQueue, 60000);
             return () => clearInterval(t);
         }
-
         if (role === "employee") {
-            // Fetch immediately on mount
             fetchNotifCount();
-            // Then poll every 30s
             const t = setInterval(fetchNotifCount, 30000);
             return () => clearInterval(t);
         }
     }, [role, fetchNotifCount]);
 
-    /* ── Re-fetch count whenever user navigates away FROM notifications page ──
-       This ensures badge clears after user reads notifications without
-       waiting for the next 30s poll cycle                                    */
     useEffect(() => {
         if (role === "employee" && pathname !== "/dashboard/employee/notifications") {
             fetchNotifCount();
         }
     }, [pathname, role, fetchNotifCount]);
 
-    /* ── isActive: exact for root, prefix for sections ── */
     const isActive = (href) => {
         if (href === `/dashboard/${role}`) return pathname === href;
         return pathname === href || pathname.startsWith(href + "/");
@@ -352,7 +358,6 @@ export default function DashboardShell({ children }) {
     const initials = getInitials(user?.full_name);
     const shouldDivide = (idx) => navItems[idx]?.icon === "settings" && idx > 0;
 
-    // Bell href — always visible for employee, shown for others when count > 0
     const bellHref = role === "employee"
         ? "/dashboard/employee/notifications"
         : role === "admin"
@@ -361,13 +366,15 @@ export default function DashboardShell({ children }) {
 
     const notifTotal = role === "employee" ? notifCount : pendingCount;
 
-    const SidebarContent = ({ onNavigate }) => (
+    const SidebarContent = ({ onNavigate, isCollapsed, onToggleCollapse }) => (
         <>
+            {/* Brand */}
             <div className="rf-brand">
                 <div className="rf-brand-icon">RF</div>
                 <span className="rf-brand-name">ReportFlow</span>
             </div>
 
+            {/* Nav links */}
             <nav className="rf-nav" role="navigation" aria-label="Main navigation">
                 {navItems.map((item, idx) => {
                     const active = isActive(item.href);
@@ -402,6 +409,22 @@ export default function DashboardShell({ children }) {
                 })}
             </nav>
 
+            {/* ── Collapse toggle row — desktop only ── */}
+            {onToggleCollapse && (
+                <div className="rf-sidebar-collapse-row rf-desktop-only">
+                    <span className="rf-collapse-label">Collapse sidebar</span>
+                    <button
+                        onClick={onToggleCollapse}
+                        className="rf-collapse-btn"
+                        aria-label={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                        title={isCollapsed ? "Expand sidebar" : "Collapse sidebar"}
+                    >
+                        <Icon name={isCollapsed ? "sidebarExpand" : "sidebarCollapse"} />
+                    </button>
+                </div>
+            )}
+
+            {/* User footer */}
             <div className="rf-user-footer">
                 <div className="rf-user-card">
                     <div className="rf-avatar" style={{ background: roleColor }}>
@@ -427,8 +450,15 @@ export default function DashboardShell({ children }) {
     return (
         <div className="rf-shell">
             {/* Desktop sidebar */}
-            <aside className={`rf-sidebar rf-desktop-only${collapsed ? " collapsed" : ""}`} aria-label="Sidebar">
-                <SidebarContent onNavigate={undefined} />
+            <aside
+                className={`rf-sidebar rf-desktop-only${collapsed ? " collapsed" : ""}`}
+                aria-label="Sidebar"
+            >
+                <SidebarContent
+                    onNavigate={undefined}
+                    isCollapsed={collapsed}
+                    onToggleCollapse={() => setCollapsed(c => !c)}
+                />
             </aside>
 
             {/* Mobile overlay */}
@@ -440,18 +470,23 @@ export default function DashboardShell({ children }) {
                 />
             )}
 
-            {/* Mobile sidebar */}
+            {/* Mobile sidebar — no collapse toggle */}
             <aside
                 className={`rf-mobile-sidebar rf-mobile-only${mobileOpen ? " open" : ""}`}
                 aria-label="Mobile sidebar"
             >
-                <SidebarContent onNavigate={() => setMobileOpen(false)} />
+                <SidebarContent
+                    onNavigate={() => setMobileOpen(false)}
+                    isCollapsed={false}
+                    onToggleCollapse={null}
+                />
             </aside>
 
             {/* Main */}
             <div className="rf-main">
                 <header className="rf-topbar">
                     <div className="rf-topbar-left">
+                        {/* Mobile hamburger */}
                         <button
                             className="rf-hamburger rf-mobile-only"
                             onClick={() => setMobileOpen(true)}
@@ -460,26 +495,13 @@ export default function DashboardShell({ children }) {
                             <Icon name="menu" />
                         </button>
 
-                        <button
-                            className="rf-toggle-btn rf-desktop-only"
-                            onClick={() => setCollapsed(c => !c)}
-                            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-                        >
-                            {collapsed ? <Icon name="chevronRight" /> : <Icon name="chevronLeft" />}
-                        </button>
-
+                        {/* Breadcrumb — no toggle button here anymore */}
                         <div className="rf-breadcrumb">
-                            <span className="rf-breadcrumb-sep" aria-hidden="true">
-                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                    <polyline points="9 18 15 12 9 6" />
-                                </svg>
-                            </span>
                             <span className="rf-breadcrumb-page">{activeLabel}</span>
                         </div>
                     </div>
 
                     <div className="rf-topbar-right">
-                        {/* Bell — always shown for employee, shown for others when count > 0 */}
                         {(role === "employee" || notifTotal > 0) && (
                             <Link
                                 href={bellHref}

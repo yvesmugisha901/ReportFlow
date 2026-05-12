@@ -3,15 +3,15 @@ import { useState } from "react";
 
 const STATUS_COLORS = {
     Pending: "bg-amber-100 text-amber-700",
+    Submitted: "bg-blue-100 text-blue-700",
     "Under Review": "bg-sky-100 text-sky-700",
     Approved: "bg-emerald-100 text-emerald-700",
     Rejected: "bg-rose-100 text-rose-700",
     "Changes Requested": "bg-violet-100 text-violet-700",
 };
 
-const ALL_STATUSES = ["All", "Pending", "Under Review", "Approved", "Rejected", "Changes Requested"];
+const ALL_STATUSES = ["All", "Pending", "Submitted", "Under Review", "Approved", "Rejected", "Changes Requested"];
 
-// ── Icons ────────────────────────────────────────────────────────
 const Icon = ({ name, className = "w-4 h-4" }) => {
     const p = {
         fill: "none",
@@ -87,10 +87,7 @@ export default function ReportTable({
             <span className="inline-flex items-center gap-1">
                 {label}
                 {sortable && sortKey === k && (
-                    <Icon
-                        name={sortAsc ? "arrowUp" : "arrowDown"}
-                        className="w-3 h-3"
-                    />
+                    <Icon name={sortAsc ? "arrowUp" : "arrowDown"} className="w-3 h-3" />
                 )}
             </span>
         </th>
@@ -98,9 +95,8 @@ export default function ReportTable({
 
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-            {/* toolbar */}
+            {/* Toolbar */}
             <div className="flex flex-col sm:flex-row sm:items-center gap-3 px-5 py-4 border-b border-gray-100">
-                {/* search */}
                 <div className="relative flex-1">
                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                         <Icon name="search" className="w-4 h-4" />
@@ -114,9 +110,10 @@ export default function ReportTable({
                     />
                 </div>
 
-                {/* status tabs */}
                 <div className="flex flex-wrap gap-1.5">
-                    {ALL_STATUSES.map((s) => (
+                    {ALL_STATUSES.filter(
+                        (s) => s === "All" || reports.some((r) => r.status === s)
+                    ).map((s) => (
                         <button
                             key={s}
                             onClick={() => setFilter(s)}
@@ -131,7 +128,7 @@ export default function ReportTable({
                 </div>
             </div>
 
-            {/* table */}
+            {/* Table */}
             <div className="overflow-x-auto">
                 <table className="w-full min-w-[600px]">
                     <thead className="bg-gray-50">
@@ -148,7 +145,10 @@ export default function ReportTable({
                     <tbody className="divide-y divide-gray-50">
                         {visible.length === 0 ? (
                             <tr>
-                                <td colSpan={showEmployee ? 7 : 6} className="text-center py-12 text-gray-400 text-sm">
+                                <td
+                                    colSpan={showEmployee ? 7 : 6}
+                                    className="text-center py-12 text-gray-400 text-sm"
+                                >
                                     No reports match your filters.
                                 </td>
                             </tr>
@@ -165,14 +165,20 @@ export default function ReportTable({
                                     <td className="px-4 py-3 text-sm text-gray-600">{r.type}</td>
                                     <td className="px-4 py-3 text-xs text-gray-500">{r.submittedAt}</td>
                                     <td className="px-4 py-3">
-                                        <span className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600"}`}>
+                                        <span
+                                            className={`px-2.5 py-1 rounded-full text-xs font-semibold ${STATUS_COLORS[r.status] ?? "bg-gray-100 text-gray-600"
+                                                }`}
+                                        >
                                             {r.status}
                                         </span>
                                     </td>
                                     <td className="px-4 py-3 text-right">
                                         {onView && (
                                             <button
-                                                onClick={() => onView(r)}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onView(r);
+                                                }}
                                                 className="inline-flex items-center gap-1 text-xs text-indigo-600 font-semibold hover:underline"
                                             >
                                                 View <Icon name="arrowRight" className="w-3 h-3" />
@@ -186,7 +192,6 @@ export default function ReportTable({
                 </table>
             </div>
 
-            {/* footer count */}
             <div className="px-5 py-3 text-xs text-gray-400 border-t border-gray-50">
                 Showing {visible.length} of {reports.length} reports
             </div>

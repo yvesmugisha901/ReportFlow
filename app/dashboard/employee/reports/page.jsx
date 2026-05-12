@@ -7,12 +7,9 @@ import ReportTable from "@/components/dashboard/ReportTable";
 import { useAuth } from "@/context/AuthContext";
 import api from "@/lib/axios";
 
-// FIX: "submitted" must map to its OWN label, NOT "Pending".
-// Mapping both "pending" and "submitted" to "Pending" caused newly submitted
-// reports to be counted in the Pending bucket, inflating the overdue count.
 const STATUS_MAP = {
     pending: "Pending",
-    submitted: "Submitted",   // ← was incorrectly "Pending" before
+    submitted: "Submitted",
     under_review: "Under Review",
     changes_requested: "Changes Requested",
     approved: "Approved",
@@ -37,7 +34,11 @@ function normalizeReport(r) {
         actor: log.reviewer?.full_name ?? "System",
         role: log.reviewer?.role ?? "",
         date: log.createdAt
-            ? new Date(log.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            ? new Date(log.createdAt).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+            })
             : "—",
         comment: log.comment ?? null,
     }));
@@ -47,7 +48,11 @@ function normalizeReport(r) {
             status: "Submitted",
             actor: "You",
             role: "Employee",
-            date: new Date(r.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            date: new Date(r.submitted_at).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+            }),
             comment: null,
         });
     }
@@ -62,10 +67,18 @@ function normalizeReport(r) {
         department: r.employee?.department?.name ?? r.department?.name ?? "—",
         frequency: capitalize(r.schedule?.frequency ?? r.frequency ?? ""),
         dueDate: r.schedule?.deadline
-            ? new Date(r.schedule.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            ? new Date(r.schedule.deadline).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+            })
             : "—",
         submittedAt: r.submitted_at
-            ? new Date(r.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            ? new Date(r.submitted_at).toLocaleDateString("en-US", {
+                month: "short",
+                day: "numeric",
+                year: "numeric",
+            })
             : null,
         status: uiStatus,
         reviewerComment,
@@ -79,8 +92,15 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, "-");
 }
 
-// FIX: "Submitted" is now its own status tab, not lumped into "Pending"
-const ALL_STATUSES = ["All", "Pending", "Submitted", "Under Review", "Approved", "Changes Requested", "Rejected"];
+const ALL_STATUSES = [
+    "All",
+    "Pending",
+    "Submitted",
+    "Under Review",
+    "Approved",
+    "Changes Requested",
+    "Rejected",
+];
 
 export default function EmployeeReportsPage() {
     const { user } = useAuth();
@@ -108,7 +128,9 @@ export default function EmployeeReportsPage() {
         }
     }, []);
 
-    useEffect(() => { load(); }, [load]);
+    useEffect(() => {
+        load();
+    }, [load]);
 
     const filtered = reports.filter(
         (r) => statusFilter === "All" || r.status === statusFilter
@@ -118,6 +140,10 @@ export default function EmployeeReportsPage() {
         acc[s] = reports.filter((r) => r.status === s).length;
         return acc;
     }, {});
+
+    // Lookup map so table's onView can find the full normalized report by id
+    // instantly — avoids .find() returning undefined if filters narrow the set.
+    const reportById = Object.fromEntries(reports.map((r) => [r.id, r]));
 
     const tableReports = filtered.map((r) => ({
         id: r.id,
@@ -189,7 +215,9 @@ export default function EmployeeReportsPage() {
                 ) : error ? (
                     <div className="text-center py-16">
                         <p className="text-red-500 mb-3">{error}</p>
-                        <button onClick={load} className="text-sm text-indigo-600 hover:underline">Retry</button>
+                        <button onClick={load} className="text-sm text-indigo-600 hover:underline">
+                            Retry
+                        </button>
                     </div>
                 ) : (
                     <>
@@ -199,39 +227,49 @@ export default function EmployeeReportsPage() {
                                 onClick={() => setStatus("All")}
                                 className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === "All"
                                     ? "bg-indigo-600 text-white"
-                                    : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"}`}
+                                    : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"
+                                    }`}
                             >
                                 All ({reports.length})
                             </button>
-                            {ALL_STATUSES.slice(1).map((status) => (
-                                // Only show tabs that have at least 1 report, to avoid clutter
-                                counts[status] > 0 && (
-                                    <button
-                                        key={status}
-                                        onClick={() => setStatus(status)}
-                                        className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === status
-                                            ? "bg-indigo-600 text-white"
-                                            : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"}`}
-                                    >
-                                        {status} ({counts[status]})
-                                    </button>
-                                )
-                            ))}
+                            {ALL_STATUSES.slice(1).map(
+                                (status) =>
+                                    counts[status] > 0 && (
+                                        <button
+                                            key={status}
+                                            onClick={() => setStatus(status)}
+                                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === status
+                                                ? "bg-indigo-600 text-white"
+                                                : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"
+                                                }`}
+                                        >
+                                            {status} ({counts[status]})
+                                        </button>
+                                    )
+                            )}
                         </div>
 
                         {/* Toolbar */}
                         <div className="flex items-center justify-between mb-4">
-                            <p className="text-xs text-gray-400">{filtered.length} report{filtered.length !== 1 ? "s" : ""}</p>
+                            <p className="text-xs text-gray-400">
+                                {filtered.length} report{filtered.length !== 1 ? "s" : ""}
+                            </p>
                             <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
                                 <button
                                     onClick={() => setView("grid")}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "grid" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-900"}`}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "grid"
+                                        ? "bg-indigo-600 text-white"
+                                        : "text-gray-500 hover:text-gray-900"
+                                        }`}
                                 >
                                     ⊞ Grid
                                 </button>
                                 <button
                                     onClick={() => setView("table")}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "table" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-900"}`}
+                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "table"
+                                        ? "bg-indigo-600 text-white"
+                                        : "text-gray-500 hover:text-gray-900"
+                                        }`}
                                 >
                                     ☰ Table
                                 </button>
@@ -259,7 +297,10 @@ export default function EmployeeReportsPage() {
                             <ReportTable
                                 reports={tableReports}
                                 showEmployee={false}
-                                onView={(r) => setSelected(reports.find((m) => m.id === r.id))}
+                                onView={(r) => {
+                                    const full = reportById[r.id];
+                                    if (full) setSelected(full);
+                                }}
                             />
                         )}
                     </>
@@ -269,25 +310,38 @@ export default function EmployeeReportsPage() {
             {/* ReportForm Modal */}
             {showForm && (
                 <ReportForm
-                    prefill={resubmitReport
-                        ? { reportType: resubmitReport.type, department: resubmitReport.department, frequency: resubmitReport.frequency }
-                        : null}
+                    prefill={
+                        resubmitReport
+                            ? {
+                                reportType: resubmitReport.type,
+                                department: resubmitReport.department,
+                                frequency: resubmitReport.frequency,
+                            }
+                            : null
+                    }
                     onClose={() => { setShowForm(false); setResubmit(null); }}
                     onSubmit={handleFormSubmit}
                 />
             )}
 
-            {/* ReportStatusHistory Modal */}
+            {/* ReportStatusHistory Modal
+                - Backdrop click (on the outer div) closes the modal.
+                - stopPropagation on the inner wrapper ensures clicks INSIDE
+                  the modal (including the View button that triggered it) do
+                  not bubble up to the backdrop and immediately close it.
+            */}
             {selectedReport && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
-                    onClick={(e) => { if (e.target === e.currentTarget) setSelected(null); }}
+                    onClick={() => setSelected(null)}
                 >
-                    <ReportStatusHistory
-                        report={selectedReport}
-                        onClose={() => setSelected(null)}
-                        onResubmit={() => handleResubmit(selectedReport)}
-                    />
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <ReportStatusHistory
+                            report={selectedReport}
+                            onClose={() => setSelected(null)}
+                            onResubmit={() => handleResubmit(selectedReport)}
+                        />
+                    </div>
                 </div>
             )}
         </div>
