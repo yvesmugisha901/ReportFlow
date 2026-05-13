@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import api from "@/lib/axios";
 
 const STATUS_STYLES = {
@@ -23,6 +23,8 @@ const Icon = ({ name, className = "w-3.5 h-3.5" }) => {
         close: <svg className={className} {...p}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
         chevron: <svg className={className} {...p}><polyline points="6 9 12 15 18 9" /></svg>,
         clock: <svg className={className} {...p}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>,
+        calendar: <svg className={className} {...p}><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>,
+        x: <svg className={className} {...p}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>,
     };
     return icons[name] ?? null;
 };
@@ -153,22 +155,25 @@ export default function AdminReportsPage() {
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("");
     const [deptFilter, setDeptFilter] = useState("");
+    const [dateFrom, setDateFrom] = useState("");
+    const [dateTo, setDateTo] = useState("");
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [preview, setPreview] = useState(null);
 
-    // ── Load reports ─────────────────────────────────────────────
-    // NOTE: `load` is intentionally NOT wrapped in useCallback so it
-    // always reads the latest state values directly from the closure.
-    const load = useCallback(async (currentPage, currentSearch, currentStatus, currentDept) => {
+    const isFilterChange = useRef(false);
+
+    const load = useCallback(async (p, s, status, dept, from, to) => {
         try {
             setLoading(true);
             const res = await api.get("/reports", {
                 params: {
-                    search: currentSearch || undefined,
-                    status: currentStatus || undefined,
-                    dept_id: currentDept || undefined,
-                    page: currentPage,
+                    search: s || undefined,
+                    status: status || undefined,
+                    dept_id: dept || undefined,
+                    date_from: from || undefined,
+                    date_to: to || undefined,
+                    page: p,
                     limit: 15,
                 },
             });
@@ -182,27 +187,28 @@ export default function AdminReportsPage() {
         }
     }, []);
 
-    // Load departments once
+    // Load departments once on mount
     useEffect(() => {
         api.get("/departments")
             .then(res => setDepts(res.data.departments ?? res.data ?? []))
             .catch(() => { });
     }, []);
 
-    // ── FIX: When filters change, reset to page 1 and fetch immediately ──
-    // By passing values directly to load() we avoid the stale-closure /
-    // double-render race that caused the department filter to be ignored.
+    // Filter changes → reset to page 1
     useEffect(() => {
+        isFilterChange.current = true;
         setPage(1);
-        load(1, search, statusFilter, deptFilter);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [search, statusFilter, deptFilter]);
+    }, [search, statusFilter, deptFilter, dateFrom, dateTo]);
 
-    // ── When only the page changes (prev/next buttons), re-fetch ──
+    // Page or filter change → fetch
     useEffect(() => {
-        load(page, search, statusFilter, deptFilter);
+        load(page, search, statusFilter, deptFilter, dateFrom, dateTo);
+        isFilterChange.current = false;
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page]);
+    }, [page, search, statusFilter, deptFilter, dateFrom, dateTo]);
+
+    const hasDateFilter = dateFrom || dateTo;
+    const clearDates = () => { setDateFrom(""); setDateTo(""); };
 
     return (
         <>
@@ -232,6 +238,7 @@ export default function AdminReportsPage() {
 
                     {/* Filters */}
                     <div className="flex flex-wrap items-center gap-2 mb-4">
+
                         {/* Search */}
                         <div className="relative">
                             <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
@@ -271,13 +278,56 @@ export default function AdminReportsPage() {
                             >
                                 <option value="">All Departments</option>
                                 {departments.map(d => (
-                                    <option key={d.dept_id} value={d.dept_id}>{d.name}</option>
+                                    <option key={d.dept_id} value={String(d.dept_id)}>
+                                        {d.name}
+                                    </option>
                                 ))}
                             </select>
                             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
                                 <Icon name="chevron" className="w-3 h-3" />
                             </span>
                         </div>
+
+                        {/* Date From */}
+                        <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                                <Icon name="calendar" className="w-3.5 h-3.5" />
+                            </span>
+                            <input
+                                type="date"
+                                className="border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm text-gray-600"
+                                value={dateFrom}
+                                max={dateTo || undefined}
+                                onChange={e => setDateFrom(e.target.value)}
+                                title="From date"
+                            />
+                        </div>
+
+                        {/* Date To */}
+                        <div className="relative">
+                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                                <Icon name="calendar" className="w-3.5 h-3.5" />
+                            </span>
+                            <input
+                                type="date"
+                                className="border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm text-gray-600"
+                                value={dateTo}
+                                min={dateFrom || undefined}
+                                onChange={e => setDateTo(e.target.value)}
+                                title="To date"
+                            />
+                        </div>
+
+                        {/* Clear dates */}
+                        {hasDateFilter && (
+                            <button
+                                onClick={clearDates}
+                                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-medium transition-colors border border-indigo-100"
+                            >
+                                <Icon name="x" className="w-3 h-3" />
+                                Clear dates
+                            </button>
+                        )}
 
                         <span className="ml-auto text-xs text-gray-400">
                             {loading ? "Loading…" : `${reports.length} report${reports.length !== 1 ? "s" : ""}`}
@@ -312,33 +362,30 @@ export default function AdminReportsPage() {
                                         {reports.map(r => {
                                             const s = STATUS_STYLES[r.status] ?? STATUS_STYLES.pending;
                                             const dept = r.employee?.department?.name ?? r.dept_name ?? "—";
-                                            const fileUrl = r.file_path ? `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}${r.file_path}` : null;
+                                            const fileUrl = r.file_path
+                                                ? `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}${r.file_path}`
+                                                : null;
                                             const hasFile = !!fileUrl;
 
                                             return (
                                                 <tr key={r.report_id} className="hover:bg-gray-50/60 transition-colors">
 
-                                                    {/* Title */}
                                                     <td className="px-4 py-3 font-medium text-gray-800 max-w-[200px] truncate whitespace-nowrap">
                                                         {r.title}
                                                     </td>
 
-                                                    {/* Employee */}
                                                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                                                         {r.employee?.full_name ?? r.employee_name ?? "—"}
                                                     </td>
 
-                                                    {/* Department */}
                                                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                                                         {dept}
                                                     </td>
 
-                                                    {/* Submitted */}
                                                     <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
                                                         {r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : "—"}
                                                     </td>
 
-                                                    {/* Status */}
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.bg} ${s.text}`}>
                                                             <span className={`w-1.5 h-1.5 rounded-full ${s.dot} flex-shrink-0`} />
@@ -346,27 +393,26 @@ export default function AdminReportsPage() {
                                                         </span>
                                                     </td>
 
-                                                    {/* Late */}
                                                     <td className="px-4 py-3 whitespace-nowrap">
-                                                        {r.is_late
-                                                            ? <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-500">
+                                                        {r.is_late ? (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-500">
                                                                 <Icon name="clock" className="w-3 h-3" /> Late
                                                             </span>
-                                                            : <span className="text-gray-300">—</span>
-                                                        }
+                                                        ) : (
+                                                            <span className="text-gray-300">—</span>
+                                                        )}
                                                     </td>
 
-                                                    {/* File indicator */}
                                                     <td className="px-4 py-3 whitespace-nowrap">
-                                                        {hasFile
-                                                            ? <span className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
+                                                        {hasFile ? (
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                                                                 <Icon name="file" className="w-3 h-3" /> File
                                                             </span>
-                                                            : <span className="text-gray-300 text-[10px]">No file</span>
-                                                        }
+                                                        ) : (
+                                                            <span className="text-gray-300 text-[10px]">No file</span>
+                                                        )}
                                                     </td>
 
-                                                    {/* Actions */}
                                                     <td className="px-4 py-3 whitespace-nowrap">
                                                         <div className="flex items-center gap-1.5">
                                                             <button
@@ -389,6 +435,7 @@ export default function AdminReportsPage() {
                                                             )}
                                                         </div>
                                                     </td>
+
                                                 </tr>
                                             );
                                         })}
@@ -418,10 +465,10 @@ export default function AdminReportsPage() {
                             </button>
                         </div>
                     )}
+
                 </div>
             </div>
 
-            {/* File preview modal */}
             {preview && <FileModal report={preview} onClose={() => setPreview(null)} />}
         </>
     );

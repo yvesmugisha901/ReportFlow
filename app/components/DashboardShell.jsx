@@ -1,8 +1,9 @@
 "use client";
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { useNotifications } from "@/context/NotificationsContext";
 import { getPendingUsers } from "@/lib/api/admin.api";
 
 const NAV = {
@@ -26,15 +27,24 @@ const NAV = {
     reviewer: [
         { label: "Overview", href: "/dashboard/reviewer", icon: "grid" },
         { label: "Review Queue", href: "/dashboard/reviewer/queue", icon: "inbox", badge: true, badgeKey: "queue" },
+        { label: "Notifications", href: "/dashboard/reviewer/notifications", icon: "bell", badge: true, badgeKey: "notifications" },
         { label: "History", href: "/dashboard/reviewer/history", icon: "clock" },
         { label: "Settings", href: "/dashboard/reviewer/settings", icon: "settings" },
     ],
     approver: [
         { label: "Overview", href: "/dashboard/approver", icon: "grid" },
         { label: "Approvals", href: "/dashboard/approver/approvals", icon: "check-circle", badge: true, badgeKey: "queue" },
+        { label: "Notifications", href: "/dashboard/approver/notifications", icon: "bell", badge: true, badgeKey: "notifications" },
         { label: "History", href: "/dashboard/approver/history", icon: "clock" },
         { label: "Settings", href: "/dashboard/approver/settings", icon: "settings" },
     ],
+};
+
+// Notification page per role (admin uses dropdown instead of a page)
+const NOTIF_HREF = {
+    employee: "/dashboard/employee/notifications",
+    reviewer: "/dashboard/reviewer/notifications",
+    approver: "/dashboard/approver/notifications",
 };
 
 const ROLE_LABELS = { admin: "Admin", employee: "Employee", reviewer: "Reviewer", approver: "Approver" };
@@ -159,8 +169,6 @@ const GLOBAL_STYLE = `
 }
 .rf-sidebar.collapsed .rf-active-dot { opacity: 0; }
 .rf-nav-divider { height: 1px; background: var(--rf-border-light); margin: 6px 2px; flex-shrink: 0; }
-
-/* ── Sidebar collapse footer ─────────────────────────────────────── */
 .rf-sidebar-collapse-row {
     display: flex; align-items: center; justify-content: space-between;
     padding: 8px 10px; border-top: 1px solid var(--rf-border-light);
@@ -179,8 +187,6 @@ const GLOBAL_STYLE = `
     transition: background var(--rf-transition), color var(--rf-transition);
 }
 .rf-collapse-btn:hover { background: var(--rf-border-light); color: var(--rf-text-primary); }
-
-/* ── User footer ─────────────────────────────────────────────────── */
 .rf-user-footer { padding: 8px 8px 10px; flex-shrink: 0; }
 .rf-user-card {
     display: flex; align-items: center; gap: 9px; padding: 8px 10px;
@@ -205,8 +211,6 @@ const GLOBAL_STYLE = `
 }
 .rf-logout-btn:hover { background: #fee2e2; color: #dc2626; }
 .rf-sidebar.collapsed .rf-logout-btn { opacity: 0; pointer-events: none; }
-
-/* ── Main area ───────────────────────────────────────────────────── */
 .rf-main { flex: 1; display: flex; flex-direction: column; min-width: 0; overflow: hidden; }
 .rf-topbar {
     display: flex; align-items: center; justify-content: space-between;
@@ -281,27 +285,23 @@ export default function DashboardShell({ children }) {
     const [collapsed, setCollapsed] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
     const [pendingCount, setPendingCount] = useState(0);
-    const [notifCount, setNotifCount] = useState(0);
+
+    // Notifications count + list from shared context (employee, reviewer, approver, admin)
+    const { unreadCount: notifCount, notifications, loading: notifLoading, markAsRead, markAllAsRead } = useNotifications();
+    const loading = notifLoading;
 
     const role = user?.role ?? "employee";
     const navItems = NAV[role] ?? NAV.employee;
     const roleColor = ROLE_COLORS[role] ?? "#6366f1";
 
-    /* stale-role guard */
+    // Stale-role guard
     useEffect(() => {
         if (!user) return;
         const urlRole = pathname.split("/")[2];
         if (urlRole && urlRole !== user.role) refreshUser();
     }, [user, pathname, refreshUser]);
 
-    const fetchNotifCount = useCallback(async () => {
-        try {
-            const { default: api } = await import("@/lib/axios");
-            const res = await api.get("/notifications/unread-count");
-            setNotifCount(res.data.count ?? 0);
-        } catch { }
-    }, []);
-
+    // Pending counts for admin / reviewer / approver queue badge
     useEffect(() => {
         if (role === "admin") {
             const fetchPending = async () => {
@@ -326,18 +326,7 @@ export default function DashboardShell({ children }) {
             const t = setInterval(fetchQueue, 60000);
             return () => clearInterval(t);
         }
-        if (role === "employee") {
-            fetchNotifCount();
-            const t = setInterval(fetchNotifCount, 30000);
-            return () => clearInterval(t);
-        }
-    }, [role, fetchNotifCount]);
-
-    useEffect(() => {
-        if (role === "employee" && pathname !== "/dashboard/employee/notifications") {
-            fetchNotifCount();
-        }
-    }, [pathname, role, fetchNotifCount]);
+    }, [role]);
 
     const isActive = (href) => {
         if (href === `/dashboard/${role}`) return pathname === href;
@@ -348,7 +337,7 @@ export default function DashboardShell({ children }) {
         if (!item.badge) return 0;
         if (item.badgeKey === "notifications") return notifCount;
         if (item.badgeKey === "queue") return pendingCount;
-        return pendingCount;
+        return pendingCount; // fallback for admin Pending Approvals
     }
 
     const activeLabel = [...navItems]
@@ -358,23 +347,157 @@ export default function DashboardShell({ children }) {
     const initials = getInitials(user?.full_name);
     const shouldDivide = (idx) => navItems[idx]?.icon === "settings" && idx > 0;
 
-    const bellHref = role === "employee"
-        ? "/dashboard/employee/notifications"
-        : role === "admin"
-            ? "/dashboard/admin/approvals"
-            : "#";
+    // Bell in topbar navigates to the role's notification page (non-admin)
+    const bellHref = NOTIF_HREF[role] ?? "/dashboard/employee/notifications";
+    // Bell is always shown for all roles — admin gets a dropdown, others get a link
+    const notifTotal = notifCount;
 
-    const notifTotal = role === "employee" ? notifCount : pendingCount;
+    // Admin notification dropdown state
+    const [adminDropOpen, setAdminDropOpen] = useState(false);
+    const adminDropRef = useRef(null);
+
+    // Close admin dropdown on outside click
+    useEffect(() => {
+        if (role !== "admin") return;
+        function handleClick(e) {
+            if (adminDropRef.current && !adminDropRef.current.contains(e.target)) {
+                setAdminDropOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClick);
+        return () => document.removeEventListener("mousedown", handleClick);
+    }, [role]);
+
+    // Admin notification dropdown component
+    const AdminNotifDropdown = () => {
+        const preview = notifications.slice(0, 6);
+        return (
+            <div ref={adminDropRef} style={{ position: "relative" }}>
+                <button
+                    onClick={() => setAdminDropOpen(o => !o)}
+                    className="rf-icon-btn"
+                    aria-label={notifTotal > 0 ? `${notifTotal} unread notifications` : "Notifications"}
+                >
+                    <Icon name="bell" />
+                    {notifTotal > 0 && <span className="rf-badge-dot-top" aria-hidden="true" />}
+                </button>
+
+                {adminDropOpen && (
+                    <div style={{
+                        position: "absolute", top: "calc(100% + 8px)", right: 0,
+                        width: "320px", background: "#fff", borderRadius: "14px",
+                        boxShadow: "0 8px 30px rgba(0,0,0,.12)", border: "1px solid #f0f0f0",
+                        zIndex: 999, overflow: "hidden",
+                    }}>
+                        {/* Header */}
+                        <div style={{
+                            display: "flex", alignItems: "center", justifyContent: "space-between",
+                            padding: "12px 16px", borderBottom: "1px solid #f3f4f6",
+                        }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                                <span style={{ fontSize: "13px", fontWeight: 700, color: "#111827" }}>Notifications</span>
+                                {notifTotal > 0 && (
+                                    <span style={{
+                                        background: "#eef2ff", color: "#4338ca", fontSize: "10px",
+                                        fontWeight: 700, padding: "2px 7px", borderRadius: "20px",
+                                    }}>{notifTotal} new</span>
+                                )}
+                            </div>
+                            {notifTotal > 0 && (
+                                <button
+                                    onClick={() => { markAllAsRead(); }}
+                                    style={{ fontSize: "11px", color: "#4f46e5", fontWeight: 600, background: "none", border: "none", cursor: "pointer" }}
+                                >
+                                    Mark all read
+                                </button>
+                            )}
+                        </div>
+
+                        {/* Items */}
+                        <div style={{ maxHeight: "300px", overflowY: "auto" }}>
+                            {loading ? (
+                                <div style={{ textAlign: "center", padding: "24px", color: "#9ca3af", fontSize: "13px" }}>
+                                    Loading…
+                                </div>
+                            ) : preview.length === 0 ? (
+                                <div style={{ textAlign: "center", padding: "32px 16px" }}>
+                                    <div style={{ fontSize: "28px", marginBottom: "6px" }}>🔔</div>
+                                    <p style={{ fontSize: "12px", color: "#9ca3af", margin: 0 }}>No notifications yet</p>
+                                </div>
+                            ) : (
+                                preview.map((n) => {
+                                    const isRead = n.is_read ?? false;
+                                    const nid = n.notification_id ?? n.id;
+                                    const TYPE_ICONS = { submitted: "📤", reviewed: "🔍", approved: "✅", rejected: "❌", changes: "✏️", scheduled: "📅", info: "ℹ️" };
+                                    const icon = TYPE_ICONS[n.type] ?? "ℹ️";
+                                    const time = n.created_at ? (() => {
+                                        const diff = Date.now() - new Date(n.created_at).getTime();
+                                        const mins = Math.floor(diff / 60000);
+                                        if (mins < 1) return "Just now";
+                                        if (mins < 60) return `${mins}m ago`;
+                                        const hrs = Math.floor(mins / 60);
+                                        if (hrs < 24) return `${hrs}h ago`;
+                                        return `${Math.floor(hrs / 24)}d ago`;
+                                    })() : "";
+
+                                    return (
+                                        <div
+                                            key={nid}
+                                            onClick={() => !isRead && markAsRead(nid)}
+                                            style={{
+                                                display: "flex", alignItems: "flex-start", gap: "10px",
+                                                padding: "10px 16px", cursor: "pointer",
+                                                background: isRead ? "#fff" : "#f5f7ff",
+                                                borderBottom: "1px solid #f9fafb",
+                                                transition: "background 150ms",
+                                            }}
+                                            onMouseEnter={e => e.currentTarget.style.background = isRead ? "#f9fafb" : "#eef2ff"}
+                                            onMouseLeave={e => e.currentTarget.style.background = isRead ? "#fff" : "#f5f7ff"}
+                                        >
+                                            <span style={{ fontSize: "16px", flexShrink: 0, marginTop: "1px" }}>{icon}</span>
+                                            <div style={{ flex: 1, minWidth: 0 }}>
+                                                <p style={{
+                                                    fontSize: "12px", fontWeight: isRead ? 400 : 600,
+                                                    color: isRead ? "#6b7280" : "#111827", margin: "0 0 2px",
+                                                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                                }}>{n.title}</p>
+                                                {n.message && (
+                                                    <p style={{ fontSize: "11px", color: "#9ca3af", margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                        {n.message}
+                                                    </p>
+                                                )}
+                                                <p style={{ fontSize: "10px", color: "#d1d5db", margin: 0 }}>{time}</p>
+                                            </div>
+                                            {!isRead && (
+                                                <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: "#4f46e5", flexShrink: 0, marginTop: "5px" }} />
+                                            )}
+                                        </div>
+                                    );
+                                })
+                            )}
+                        </div>
+
+                        {/* Footer */}
+                        {notifications.length > 6 && (
+                            <div style={{ padding: "10px 16px", borderTop: "1px solid #f3f4f6", textAlign: "center" }}>
+                                <span style={{ fontSize: "11px", color: "#9ca3af" }}>
+                                    {notifications.length - 6} more — showing latest 6
+                                </span>
+                            </div>
+                        )}
+                    </div>
+                )}
+            </div>
+        );
+    };
 
     const SidebarContent = ({ onNavigate, isCollapsed, onToggleCollapse }) => (
         <>
-            {/* Brand */}
             <div className="rf-brand">
                 <div className="rf-brand-icon">RF</div>
                 <span className="rf-brand-name">ReportFlow</span>
             </div>
 
-            {/* Nav links */}
             <nav className="rf-nav" role="navigation" aria-label="Main navigation">
                 {navItems.map((item, idx) => {
                     const active = isActive(item.href);
@@ -409,7 +532,6 @@ export default function DashboardShell({ children }) {
                 })}
             </nav>
 
-            {/* ── Collapse toggle row — desktop only ── */}
             {onToggleCollapse && (
                 <div className="rf-sidebar-collapse-row rf-desktop-only">
                     <span className="rf-collapse-label">Collapse sidebar</span>
@@ -424,7 +546,6 @@ export default function DashboardShell({ children }) {
                 </div>
             )}
 
-            {/* User footer */}
             <div className="rf-user-footer">
                 <div className="rf-user-card">
                     <div className="rf-avatar" style={{ background: roleColor }}>
@@ -470,7 +591,7 @@ export default function DashboardShell({ children }) {
                 />
             )}
 
-            {/* Mobile sidebar — no collapse toggle */}
+            {/* Mobile sidebar */}
             <aside
                 className={`rf-mobile-sidebar rf-mobile-only${mobileOpen ? " open" : ""}`}
                 aria-label="Mobile sidebar"
@@ -486,7 +607,6 @@ export default function DashboardShell({ children }) {
             <div className="rf-main">
                 <header className="rf-topbar">
                     <div className="rf-topbar-left">
-                        {/* Mobile hamburger */}
                         <button
                             className="rf-hamburger rf-mobile-only"
                             onClick={() => setMobileOpen(true)}
@@ -494,21 +614,26 @@ export default function DashboardShell({ children }) {
                         >
                             <Icon name="menu" />
                         </button>
-
-                        {/* Breadcrumb — no toggle button here anymore */}
                         <div className="rf-breadcrumb">
                             <span className="rf-breadcrumb-page">{activeLabel}</span>
                         </div>
                     </div>
 
                     <div className="rf-topbar-right">
-                        {(role === "employee" || notifTotal > 0) && (
+                        {/* Bell — always visible for all roles.
+                            Admin: dropdown panel inline.
+                            Others: link to their notifications page. */}
+                        {role === "admin" ? (
+                            <AdminNotifDropdown />
+                        ) : (
                             <Link
                                 href={bellHref}
                                 className="rf-icon-btn"
-                                aria-label={notifTotal > 0
-                                    ? `${notifTotal} unread notification${notifTotal !== 1 ? "s" : ""}`
-                                    : "Notifications"}
+                                aria-label={
+                                    notifTotal > 0
+                                        ? `${notifTotal} unread notification${notifTotal !== 1 ? "s" : ""}`
+                                        : "Notifications"
+                                }
                             >
                                 <Icon name="bell" />
                                 {notifTotal > 0 && (

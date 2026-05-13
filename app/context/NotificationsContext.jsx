@@ -6,68 +6,106 @@ import {
     getUnreadCount,
     markAsRead,
     markAllAsRead,
+    deleteNotification,
+    deleteAllRead,
 } from "@/lib/api/notifications.api";
 import { useAuth } from "@/context/AuthContext";
 
 const NotificationsContext = createContext(null);
 
+// Roles that get notifications
+const NOTIF_ROLES = ["employee", "reviewer", "approver", "admin"];
+
 export function NotificationsProvider({ children }) {
-    const { isAuthenticated } = useAuth();
+    const { user, loading: authLoading } = useAuth();
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(false);
 
+    const hasNotifications = NOTIF_ROLES.includes(user?.role);
+    const ready = !authLoading && hasNotifications;
+
     const fetchNotifications = useCallback(async () => {
-        if (!isAuthenticated) return;
+        if (!ready) return;
         setLoading(true);
         try {
             const data = await getNotifications();
-            setNotifications(data.notifications ?? data);
+            const list = data.notifications ?? data ?? [];
+            setNotifications(list);
+            setUnreadCount(list.filter((n) => !n.is_read).length);
         } catch {
-            // Silent fail — notifications are non-critical
+            // Silent — notifications are non-critical
         } finally {
             setLoading(false);
         }
-    }, [isAuthenticated]);
+    }, [ready]);
 
     const fetchUnreadCount = useCallback(async () => {
-        if (!isAuthenticated) return;
+        if (!ready) return;
         try {
             const data = await getUnreadCount();
             setUnreadCount(data.count ?? 0);
         } catch {
-            // Silent fail
+            // Silent
         }
-    }, [isAuthenticated]);
+    }, [ready]);
 
-    // Poll for new notifications every 60 seconds
+    // On mount / when auth settles: fetch full list once, then poll count every 30s
     useEffect(() => {
-        if (!isAuthenticated) return;
-
+        if (!ready) return;
         fetchNotifications();
-        fetchUnreadCount();
-
-        const interval = setInterval(() => {
-            fetchUnreadCount();
-        }, 60_000);
-
+        const interval = setInterval(fetchUnreadCount, 30_000);
         return () => clearInterval(interval);
-    }, [isAuthenticated, fetchNotifications, fetchUnreadCount]);
+    }, [ready, fetchNotifications, fetchUnreadCount]);
+
+    // ── Actions ──────────────────────────────────────────────────────────
 
     const handleMarkAsRead = useCallback(async (notificationId) => {
-        await markAsRead(notificationId);
-        setNotifications((prev) =>
-            prev.map((n) =>
-                n.notification_id === notificationId ? { ...n, is_read: true } : n
-            )
-        );
-        setUnreadCount((prev) => Math.max(0, prev - 1));
+        try {
+            await markAsRead(notificationId);
+            setNotifications((prev) =>
+                prev.map((n) =>
+                    n.notification_id === notificationId ? { ...n, is_read: true } : n
+                )
+            );
+            setUnreadCount((prev) => Math.max(0, prev - 1));
+        } catch {
+            // Silent
+        }
     }, []);
 
     const handleMarkAllAsRead = useCallback(async () => {
-        await markAllAsRead();
-        setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
-        setUnreadCount(0);
+        try {
+            await markAllAsRead();
+            setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
+            setUnreadCount(0);
+        } catch {
+            // Silent
+        }
+    }, []);
+
+    const handleDelete = useCallback(async (notificationId) => {
+        try {
+            await deleteNotification(notificationId);
+            setNotifications((prev) => {
+                const removed = prev.find((n) => n.notification_id === notificationId);
+                if (removed && !removed.is_read) {
+                    setUnreadCount((c) => Math.max(0, c - 1));
+                }
+                return prev.filter((n) => n.notification_id !== notificationId);
+            });
+        } catch {
+            // Silent
+        }
+    }, []);
+
+    const handleDeleteAllRead = useCallback(async () => {
+        try {
+            await deleteAllRead();
+            setNotifications((prev) => prev.filter((n) => !n.is_read));
+        } catch {
+            // Silent
+        }
     }, []);
 
     return (
@@ -79,6 +117,8 @@ export function NotificationsProvider({ children }) {
                 fetchNotifications,
                 markAsRead: handleMarkAsRead,
                 markAllAsRead: handleMarkAllAsRead,
+                deleteNotification: handleDelete,
+                deleteAllRead: handleDeleteAllRead,
             }}
         >
             {children}

@@ -254,15 +254,7 @@ export default function SchedulesPage() {
                             placeholder="e.g. Monthly Finance Report"
                         />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Report Type</label>
-                        <input
-                            className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                            value={form.report_type}
-                            onChange={setF("report_type")}
-                            placeholder="e.g. Financial Summary"
-                        />
-                    </div>
+
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Frequency *</label>
@@ -349,7 +341,7 @@ export default function SchedulesPage() {
             {/* Delete Modal */}
             <Modal open={!!deleteModal} onClose={() => setDeleteModal(null)}>
                 <div className="text-center">
-                    <div className="text-4xl mb-3">⚠️</div>
+
                     <h2 className="text-lg font-bold text-gray-900 mb-2">Delete Schedule?</h2>
                     <p className="text-sm text-gray-500 mb-6">
                         Permanently delete <strong>{deleteModal?.title}</strong>? Reports linked to this schedule will lose their schedule reference.
