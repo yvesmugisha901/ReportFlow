@@ -103,10 +103,15 @@ export default function ReviewerDashboard() {
         { label: "Dept. Approved", value: recentLogs.filter(r => r.action === "approved").length, icon: "chart", color: "violet" },
     ];
 
-    const deptName = user?.department?.name ?? "Your Department";
+    const deptName =
+        user?.department?.name ??
+        user?.department_name ??
+        user?.dept_name ??
+        user?.dept ??
+        null;
     const total = pendingReports.length + recentLogs.length;
     const submitted = recentLogs.length;
-    const deptCompliance = [{ name: deptName, submitted, total: total || 1, color: "violet" }];
+    const deptCompliance = [{ name: deptName ?? "Department", submitted, total: total || 1, color: "violet" }];
 
     const firstName = user?.full_name?.split(" ")[0] ?? "Reviewer";
 
@@ -154,7 +159,10 @@ export default function ReviewerDashboard() {
 
                             {/* Right column */}
                             <div className="flex flex-col gap-6">
-                                <ComplianceBar departments={deptCompliance} title={`${deptName} Progress`} />
+                                <ComplianceBar
+                                    departments={deptCompliance}
+                                    title={deptName ? `${deptName} Progress` : "Department Progress"}
+                                />
 
                                 {/* Recently reviewed */}
                                 <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">

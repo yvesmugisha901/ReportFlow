@@ -142,7 +142,6 @@ export default function DepartmentsPage() {
                     </div>
                 ) : departments.length === 0 ? (
                     <div className="text-center py-24 text-gray-400">
-                        <div className="text-5xl mb-4">🏢</div>
                         <p className="font-medium">No departments yet</p>
                         <p className="text-sm mt-1">Create your first department to get started.</p>
                     </div>
@@ -179,7 +178,7 @@ export default function DepartmentsPage() {
                                 <div className="border-t border-gray-100 pt-3 space-y-1.5">
                                     {/* Reviewer — backend includes dept.reviewer object directly */}
                                     <div className="flex items-center gap-2 text-xs text-gray-500">
-                                        <span>👤 Reviewer:</span>
+                                        <span> Reviewer:</span>
                                         <span className="font-medium text-gray-700">
                                             {dept.reviewer?.full_name ?? "Not assigned"}
                                         </span>
@@ -187,7 +186,7 @@ export default function DepartmentsPage() {
 
                                     {/* Teams count — backend includes dept.teams array */}
                                     <div className="flex items-center gap-2 text-xs text-gray-500">
-                                        <span>👥 Teams:</span>
+                                        <span> Teams:</span>
                                         <span className="font-medium text-gray-700">
                                             {dept.teams?.length
                                                 ? dept.teams.map(t => t.name).join(", ")
@@ -270,7 +269,7 @@ export default function DepartmentsPage() {
             {/* Delete Confirm Modal */}
             <Modal open={!!deleteModal} onClose={() => setDeleteModal(null)}>
                 <div className="text-center">
-                    <div className="text-4xl mb-3">⚠️</div>
+
                     <h2 className="text-lg font-bold text-gray-900 mb-2">Delete Department?</h2>
                     <p className="text-sm text-gray-500 mb-6">
                         This will permanently delete <strong>{deleteModal?.name}</strong>. This cannot be undone.

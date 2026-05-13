@@ -141,8 +141,6 @@ export default function EmployeeReportsPage() {
         return acc;
     }, {});
 
-    // Lookup map so table's onView can find the full normalized report by id
-    // instantly — avoids .find() returning undefined if filters narrow the set.
     const reportById = Object.fromEntries(reports.map((r) => [r.id, r]));
 
     const tableReports = filtered.map((r) => ({
@@ -221,33 +219,35 @@ export default function EmployeeReportsPage() {
                     </div>
                 ) : (
                     <>
-                        {/* Status Filter Pills */}
-                        <div className="flex flex-wrap gap-2 mb-6">
-                            <button
-                                onClick={() => setStatus("All")}
-                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === "All"
-                                    ? "bg-indigo-600 text-white"
-                                    : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"
-                                    }`}
-                            >
-                                All ({reports.length})
-                            </button>
-                            {ALL_STATUSES.slice(1).map(
-                                (status) =>
-                                    counts[status] > 0 && (
-                                        <button
-                                            key={status}
-                                            onClick={() => setStatus(status)}
-                                            className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === status
-                                                ? "bg-indigo-600 text-white"
-                                                : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"
-                                                }`}
-                                        >
-                                            {status} ({counts[status]})
-                                        </button>
-                                    )
-                            )}
-                        </div>
+                        {/* Status Filter Pills — hidden in table view (table has its own filters) */}
+                        {view === "grid" && (
+                            <div className="flex flex-wrap gap-2 mb-6">
+                                <button
+                                    onClick={() => setStatus("All")}
+                                    className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === "All"
+                                        ? "bg-indigo-600 text-white"
+                                        : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"
+                                        }`}
+                                >
+                                    All ({reports.length})
+                                </button>
+                                {ALL_STATUSES.slice(1).map(
+                                    (status) =>
+                                        counts[status] > 0 && (
+                                            <button
+                                                key={status}
+                                                onClick={() => setStatus(status)}
+                                                className={`px-4 py-1.5 rounded-full text-xs font-bold transition-colors ${statusFilter === status
+                                                    ? "bg-indigo-600 text-white"
+                                                    : "bg-white border border-gray-200 text-gray-600 hover:border-indigo-300"
+                                                    }`}
+                                            >
+                                                {status} ({counts[status]})
+                                            </button>
+                                        )
+                                )}
+                            </div>
+                        )}
 
                         {/* Toolbar */}
                         <div className="flex items-center justify-between mb-4">
@@ -324,12 +324,6 @@ export default function EmployeeReportsPage() {
                 />
             )}
 
-            {/* ReportStatusHistory Modal
-                - Backdrop click (on the outer div) closes the modal.
-                - stopPropagation on the inner wrapper ensures clicks INSIDE
-                  the modal (including the View button that triggered it) do
-                  not bubble up to the backdrop and immediately close it.
-            */}
             {selectedReport && (
                 <div
                     className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30 backdrop-blur-sm"
