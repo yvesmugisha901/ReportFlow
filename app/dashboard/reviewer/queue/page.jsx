@@ -54,9 +54,8 @@ export default function ReviewerQueuePage() {
         <div className="min-h-screen bg-[#f8f9fc]">
             <div className="max-w-4xl mx-auto px-6 py-8">
                 <div className="mb-8">
-                    <p className="text-sm text-gray-500 mb-1">Reviewer · Stage 1</p>
                     <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Review Queue</h1>
-                    <p className="text-sm text-gray-500 mt-1">Reports awaiting your Stage 1 review.</p>
+                    <p className="text-sm text-gray-500 mt-1">Reports awaiting your review.</p>
                 </div>
 
                 {loading ? (

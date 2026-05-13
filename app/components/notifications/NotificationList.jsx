@@ -139,7 +139,6 @@ export default function NotificationList() {
                         </div>
                     ) : paginated.length === 0 ? (
                         <div className="text-center py-16 text-gray-400">
-                            <div className="text-4xl mb-3">🔔</div>
                             <p className="font-medium text-sm">No notifications here</p>
                             <p className="text-xs mt-1">Check back later or switch filters</p>
                         </div>

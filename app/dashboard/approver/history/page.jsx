@@ -36,9 +36,9 @@ export default function ApproverHistoryPage() {
             <div className="max-w-4xl mx-auto px-6 py-8">
 
                 <div className="mb-8">
-                    <p className="text-sm text-gray-500 mb-1">Approver · Activity</p>
+
                     <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Approval History</h1>
-                    <p className="text-sm text-gray-500 mt-1">All Stage 2 decisions you have made.</p>
+                    <p className="text-sm text-gray-500 mt-1">All approval decisions you have made.</p>
                 </div>
 
                 <div className="flex gap-2 mb-6 flex-wrap">
@@ -59,7 +59,6 @@ export default function ApproverHistoryPage() {
                     </div>
                 ) : filtered.length === 0 ? (
                     <div className="text-center py-20 text-gray-400">
-                        <div className="text-4xl mb-3">🕓</div>
                         <p className="font-medium">No approvals found</p>
                     </div>
                 ) : (

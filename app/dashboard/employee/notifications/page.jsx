@@ -3,12 +3,12 @@ import { useState, useEffect, useCallback } from "react";
 import api from "@/lib/axios";
 
 const EVENT_ICONS = {
-    approved: "✅",
-    rejected: "❌",
-    changes_requested: "✏️",
-    submitted: "📤",
-    under_review: "🔍",
-    final_approved: "🎉",
+    approved: "",
+    rejected: "",
+    changes_requested: "",
+    submitted: "",
+    under_review: "",
+    final_approved: "",
 };
 
 const EVENT_COLORS = {

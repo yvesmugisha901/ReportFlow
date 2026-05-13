@@ -15,13 +15,13 @@
  */
 
 const TYPE_META = {
-    submitted: { icon: "📤", bg: "bg-indigo-100", text: "text-indigo-600" },
-    reviewed: { icon: "🔍", bg: "bg-sky-100", text: "text-sky-600" },
-    approved: { icon: "✅", bg: "bg-emerald-100", text: "text-emerald-600" },
-    rejected: { icon: "❌", bg: "bg-rose-100", text: "text-rose-600" },
-    changes: { icon: "✏️", bg: "bg-violet-100", text: "text-violet-600" },
-    scheduled: { icon: "📅", bg: "bg-amber-100", text: "text-amber-600" },
-    info: { icon: "ℹ️", bg: "bg-gray-100", text: "text-gray-600" },
+    submitted: { icon: "", bg: "bg-indigo-100", text: "text-indigo-600" },
+    reviewed: { icon: "", bg: "bg-sky-100", text: "text-sky-600" },
+    approved: { icon: "", bg: "bg-emerald-100", text: "text-emerald-600" },
+    rejected: { icon: "", bg: "bg-rose-100", text: "text-rose-600" },
+    changes: { icon: "", bg: "bg-violet-100", text: "text-violet-600" },
+    scheduled: { icon: "", bg: "bg-amber-100", text: "text-amber-600" },
+    info: { icon: "ℹ", bg: "bg-gray-100", text: "text-gray-600" },
 };
 
 function formatTime(raw) {

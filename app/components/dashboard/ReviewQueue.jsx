@@ -217,14 +217,11 @@ export default function ReviewQueue({ items = [], onAction, stage = 1, title }) 
                 {/* Header */}
                 <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
                     <div>
-                        <h3 className="text-sm font-bold text-[#0f1117]">{heading}</h3>
+                        <h3 className="text-sm font-bold text-[#0f1117]"></h3>
                         <p className="text-xs text-gray-400 mt-0.5">
                             {pending.length} pending · {done.size} actioned this session
                         </p>
                     </div>
-                    <span className="px-3 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">
-                        Stage {stage}
-                    </span>
                 </div>
 
                 {/* List */}
@@ -281,7 +278,7 @@ export default function ReviewQueue({ items = [], onAction, stage = 1, title }) 
                                         <div className="px-5 pb-5 border-t border-dashed border-gray-100 bg-gray-50/50">
                                             <div className="pt-4">
                                                 <div className="flex items-center gap-2 mb-3 px-3 py-2 bg-amber-50 border border-amber-200 rounded-xl">
-                                                    <span className="text-amber-500 flex-shrink-0">💡</span>
+                                                    <span className="text-amber-500 flex-shrink-0"></span>
                                                     <p className="text-[11px] text-amber-700">
                                                         Make sure you have read the report before taking action.{" "}
                                                         <button

@@ -18,13 +18,13 @@
 import { useState } from "react";
 
 const TYPE_META = {
-    submitted: { icon: "📤", dot: "bg-indigo-500" },
-    approved: { icon: "✅", dot: "bg-emerald-500" },
-    rejected: { icon: "❌", dot: "bg-rose-500" },
-    review: { icon: "🔍", dot: "bg-sky-500" },
-    changes: { icon: "✏️", dot: "bg-violet-500" },
-    scheduled: { icon: "📅", dot: "bg-amber-400" },
-    info: { icon: "ℹ️", dot: "bg-gray-400" },
+    submitted: { icon: "", dot: "bg-indigo-500" },
+    approved: { icon: "", dot: "bg-emerald-500" },
+    rejected: { icon: "", dot: "bg-rose-500" },
+    review: { icon: "", dot: "bg-sky-500" },
+    changes: { icon: "", dot: "bg-violet-500" },
+    scheduled: { icon: "", dot: "bg-amber-400" },
+    info: { icon: "ℹ", dot: "bg-gray-400" },
 };
 
 export default function ActivityFeed({
