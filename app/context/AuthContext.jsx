@@ -9,29 +9,47 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [token, setToken] = useState(null);
-    const [loading, setLoading] = useState(true); // true until we've checked localStorage
+    const [loading, setLoading] = useState(true);
     const router = useRouter();
 
-    // On mount: restore session from localStorage
+    // On mount: restore session from localStorage, then always re-fetch
+    // fresh user data (so nested department/team is never stale)
     useEffect(() => {
         const storedToken = localStorage.getItem("token");
         const storedUser = localStorage.getItem("user");
 
         if (storedToken && storedUser) {
             try {
+                // Optimistically set from cache so the UI renders immediately
                 setToken(storedToken);
                 setUser(JSON.parse(storedUser));
+
+                // ✅ Always re-fetch to get fresh nested data (department.name, team.name)
+                getMe()
+                    .then((data) => {
+                        const fresh = data.user ?? data;
+                        setUser(fresh);
+                        localStorage.setItem("user", JSON.stringify(fresh));
+                    })
+                    .catch(() => {
+                        // Token is invalid / expired — clear session
+                        localStorage.removeItem("token");
+                        localStorage.removeItem("user");
+                        setToken(null);
+                        setUser(null);
+                    });
             } catch {
-                // Corrupted data — clear it
+                // Corrupted localStorage data — clear it
                 localStorage.removeItem("token");
                 localStorage.removeItem("user");
             }
         }
+
         setLoading(false);
     }, []);
 
     const login = useCallback(async ({ email, password }) => {
-        // loginUser returns { token, user } from the backend
+        // loginUser returns { token, user } — user now includes nested department
         const data = await loginUser({ email, password });
 
         const { token: newToken, user: newUser } = data;
@@ -41,7 +59,6 @@ export function AuthProvider({ children }) {
         setToken(newToken);
         setUser(newUser);
 
-        // Redirect based on role
         redirectByRole(newUser.role, router);
     }, [router]);
 
@@ -56,8 +73,9 @@ export function AuthProvider({ children }) {
     const refreshUser = useCallback(async () => {
         try {
             const data = await getMe();
-            setUser(data.user ?? data);
-            localStorage.setItem("user", JSON.stringify(data.user ?? data));
+            const fresh = data.user ?? data;
+            setUser(fresh);
+            localStorage.setItem("user", JSON.stringify(fresh));
         } catch {
             logout();
         }
@@ -83,7 +101,7 @@ export function useAuth() {
     return ctx;
 }
 
-// Role-based redirect helper
+// ─── Role-based redirect helper ───────────────────────────────
 function redirectByRole(role, router) {
     switch (role) {
         case "admin":
@@ -92,10 +110,10 @@ function redirectByRole(role, router) {
         case "employee":
             router.push("/dashboard/employee");
             break;
-        case "reviewer":                          // was "department_reviewer"
+        case "reviewer":
             router.push("/dashboard/reviewer");
             break;
-        case "approver":                          // was "final_approver"
+        case "approver":
             router.push("/dashboard/approver");
             break;
         default:

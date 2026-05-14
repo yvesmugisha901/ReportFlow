@@ -45,9 +45,14 @@ export default function ReviewerDashboard() {
     const { user } = useAuth();
     const [pendingReports, setPending] = useState([]);
     const [recentLogs, setRecentLogs] = useState([]);
+    const [deptCompliance, setDeptCompliance] = useState([]);  // ✅ real data
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
     const [actioning, setActioning] = useState(null);
+
+    // ✅ Resolve dept info from the enriched user object (set by AuthContext via getMe)
+    const deptId = user?.department?.dept_id ?? user?.dept_id ?? null;
+    const deptName = user?.department?.name ?? user?.department_name ?? user?.dept_name ?? null;
 
     const load = useCallback(async () => {
         try {
@@ -59,8 +64,7 @@ export default function ReviewerDashboard() {
                 api.get("/reports"),
             ]);
 
-            setPending((pendingRes.data.reports ?? []).map(normalizeReport));
-
+            const pending = (pendingRes.data.reports ?? []).map(normalizeReport);
             const reviewed = (allRes.data.reports ?? [])
                 .filter(r => ['under_review', 'approved', 'rejected', 'changes_requested'].includes(r.status))
                 .slice(0, 5)
@@ -72,13 +76,46 @@ export default function ReviewerDashboard() {
                         ? new Date(r.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
                         : "—",
                 }));
+
+            setPending(pending);
             setRecentLogs(reviewed);
+
+            // ✅ Fetch real department compliance from dedicated endpoint
+            if (deptId) {
+                try {
+                    const compRes = await api.get(`/departments/${deptId}/compliance`);
+                    setDeptCompliance([{
+                        name: compRes.data.name ?? deptName ?? "Department",
+                        submitted: compRes.data.submitted ?? 0,
+                        total: compRes.data.total || 1,
+                        color: "violet",
+                    }]);
+                } catch {
+                    // Fallback: derive from loaded reports if compliance endpoint fails
+                    const total = pending.length + reviewed.length;
+                    setDeptCompliance([{
+                        name: deptName ?? "Department",
+                        submitted: reviewed.length,
+                        total: total || 1,
+                        color: "violet",
+                    }]);
+                }
+            } else {
+                // No dept_id yet (user object still loading from getMe) — use derived counts
+                const total = pending.length + reviewed.length;
+                setDeptCompliance([{
+                    name: deptName ?? "Department",
+                    submitted: reviewed.length,
+                    total: total || 1,
+                    color: "violet",
+                }]);
+            }
         } catch {
             setError("Failed to load review queue.");
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [deptId, deptName]);
 
     useEffect(() => { load(); }, [load]);
 
@@ -103,17 +140,10 @@ export default function ReviewerDashboard() {
         { label: "Dept. Approved", value: recentLogs.filter(r => r.action === "approved").length, icon: "chart", color: "violet" },
     ];
 
-    const deptName =
-        user?.department?.name ??
-        user?.department_name ??
-        user?.dept_name ??
-        user?.dept ??
-        null;
-    const total = pendingReports.length + recentLogs.length;
-    const submitted = recentLogs.length;
-    const deptCompliance = [{ name: deptName ?? "Department", submitted, total: total || 1, color: "violet" }];
-
     const firstName = user?.full_name?.split(" ")[0] ?? "Reviewer";
+
+    // ✅ Title shows the actual department name
+    const complianceTitle = deptName ? `${deptName} Progress` : "Department Progress";
 
     return (
         <div className="min-h-screen bg-[#f8f9fc] text-[#0f1117]">
@@ -130,6 +160,10 @@ export default function ReviewerDashboard() {
                         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
                             Hey {firstName}, here&apos;s your queue
                         </h1>
+                        {/* ✅ Show dept name as subtitle */}
+                        {deptName && (
+                            <p className="text-sm text-gray-400 mt-0.5">{deptName}</p>
+                        )}
                     </div>
                 </div>
 
@@ -159,9 +193,10 @@ export default function ReviewerDashboard() {
 
                             {/* Right column */}
                             <div className="flex flex-col gap-6">
+                                {/* ✅ Real department name + real compliance data */}
                                 <ComplianceBar
                                     departments={deptCompliance}
-                                    title={deptName ? `${deptName} Progress` : "Department Progress"}
+                                    title={complianceTitle}
                                 />
 
                                 {/* Recently reviewed */}
