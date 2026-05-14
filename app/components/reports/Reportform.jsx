@@ -10,6 +10,26 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, "-");
 }
 
+// Inline SVG icons
+function Icon({ name, size = 16 }) {
+    const s = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" };
+    switch (name) {
+        case "check": return <svg {...s}><polyline points="20 6 9 17 4 12" /></svg>;
+        case "check-circle": return <svg {...s}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>;
+        case "x": return <svg {...s}><line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" /></svg>;
+        case "x-circle": return <svg {...s}><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>;
+        case "paperclip": return <svg {...s}><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" /></svg>;
+        case "alert": return <svg {...s}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>;
+        case "info": return <svg {...s}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>;
+        case "star": return <svg {...s}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>;
+        case "building": return <svg {...s}><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4" /></svg>;
+        case "users": return <svg {...s}><path d="M16 11c1.657 0 3-1.343 3-3s-1.343-3-3-3M20 21c0-2.21-1.79-4-4-4M1 21c0-2.761 2.239-5 5-5h6c2.761 0 5 2.239 5 5" /><circle cx="9" cy="7" r="4" /></svg>;
+        case "calendar": return <svg {...s}><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>;
+        case "loader": return <svg {...s} style={{ animation: "spin 1s linear infinite" }}><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg>;
+        default: return null;
+    }
+}
+
 export default function ReportForm({ prefill = null, onClose, onSubmit }) {
     const { user } = useAuth();
     const [schedules, setSchedules] = useState([]);
@@ -90,7 +110,6 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
         return Object.keys(e).length === 0;
     }
 
-    // ── Fixed: else if prevents both conditions firing at once ──
     function handleNext() {
         if (step === 1 && validateStep1()) {
             setStep(2);
@@ -124,12 +143,7 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
             fd.append("period_start", form.periodStart);
             fd.append("period_end", form.periodEnd);
             if (form.schedule_id) fd.append("schedule_id", form.schedule_id);
-
-            // Use "files[]" to match multer's upload.array('files[]', 10)
-            form.files.forEach((file) => {
-                fd.append("files[]", file);
-            });
-
+            form.files.forEach((file) => { fd.append("files[]", file); });
             await onSubmit(fd);
             setSubmitted(true);
         } catch (err) {
@@ -156,7 +170,12 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                         <h2 className="text-lg font-extrabold text-[#0f1117]">Submit Report</h2>
                         <p className="text-xs text-gray-400 mt-0.5">Fill in all sections and attach your file</p>
                     </div>
-                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors text-sm">✕</button>
+                    <button
+                        onClick={onClose}
+                        className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors"
+                    >
+                        <Icon name="x" size={14} />
+                    </button>
                 </div>
 
                 {/* Step Indicator */}
@@ -170,7 +189,7 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                 <div key={label} className="flex items-center flex-1 last:flex-none">
                                     <div className="flex flex-col items-center">
                                         <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition-colors ${done ? "bg-indigo-600 text-white" : active ? "bg-indigo-600 text-white ring-4 ring-indigo-100" : "bg-gray-100 text-gray-400"}`}>
-                                            {done ? "✓" : n}
+                                            {done ? <Icon name="check" size={12} /> : n}
                                         </div>
                                         <span className={`text-[10px] mt-1 font-medium ${active || done ? "text-indigo-600" : "text-gray-400"}`}>{label}</span>
                                     </div>
@@ -189,7 +208,9 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                     {/* SUCCESS */}
                     {submitted && (
                         <div className="flex flex-col items-center justify-center py-12 text-center">
-                            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-3xl mb-4">✅</div>
+                            <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center text-emerald-600 mb-4">
+                                <Icon name="check-circle" size={32} />
+                            </div>
                             <h3 className="text-lg font-extrabold text-gray-900 mb-1">Report Submitted!</h3>
                             <p className="text-sm text-gray-500">Your report has been sent to your department reviewer.</p>
                         </div>
@@ -221,9 +242,24 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
 
                             {selectedSchedule && (
                                 <div className="bg-indigo-50 rounded-xl px-4 py-3 text-xs text-indigo-700 flex flex-wrap gap-x-4 gap-y-1">
-                                    {selectedSchedule.department?.name && <span>🏢 {selectedSchedule.department.name}</span>}
-                                    {selectedSchedule.team?.name && <span>👥 {selectedSchedule.team.name}</span>}
-                                    {selectedSchedule.deadline && <span>📅 Due {new Date(selectedSchedule.deadline).toLocaleDateString()}</span>}
+                                    {selectedSchedule.department?.name && (
+                                        <span className="flex items-center gap-1.5">
+                                            <Icon name="building" size={12} />
+                                            {selectedSchedule.department.name}
+                                        </span>
+                                    )}
+                                    {selectedSchedule.team?.name && (
+                                        <span className="flex items-center gap-1.5">
+                                            <Icon name="users" size={12} />
+                                            {selectedSchedule.team.name}
+                                        </span>
+                                    )}
+                                    {selectedSchedule.deadline && (
+                                        <span className="flex items-center gap-1.5">
+                                            <Icon name="calendar" size={12} />
+                                            Due {new Date(selectedSchedule.deadline).toLocaleDateString()}
+                                        </span>
+                                    )}
                                 </div>
                             )}
 
@@ -292,7 +328,9 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                     className="border-2 border-dashed border-gray-200 rounded-xl p-5 text-center cursor-pointer hover:border-indigo-300 hover:bg-indigo-50/30 transition-colors"
                                     onClick={() => fileInputRef.current?.click()}
                                 >
-                                    <div className="text-2xl mb-1">📎</div>
+                                    <div className="flex justify-center mb-1 text-gray-400">
+                                        <Icon name="paperclip" size={24} />
+                                    </div>
                                     <p className="text-sm font-medium text-gray-600">Click to attach files</p>
                                     <p className="text-xs text-gray-400">PDF, DOCX, XLSX — max 10MB each</p>
                                     <input
@@ -309,13 +347,15 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                         {form.files.map((f, i) => (
                                             <li key={i} className="flex items-center justify-between bg-indigo-50 rounded-xl px-3 py-2">
                                                 <div className="flex items-center gap-2 min-w-0">
-                                                    <span className="text-indigo-400">📎</span>
+                                                    <span className="text-indigo-400"><Icon name="paperclip" size={12} /></span>
                                                     <span className="text-xs font-medium text-indigo-700 truncate">{f.name}</span>
                                                     <span className="text-[10px] text-gray-400 shrink-0">
                                                         ({(f.size / 1024 / 1024).toFixed(1)} MB)
                                                     </span>
                                                 </div>
-                                                <button onClick={() => removeFile(i)} className="text-xs text-rose-500 hover:text-rose-700 ml-2 font-bold shrink-0">✕</button>
+                                                <button onClick={() => removeFile(i)} className="text-rose-400 hover:text-rose-600 ml-2 shrink-0">
+                                                    <Icon name="x" size={12} />
+                                                </button>
                                             </li>
                                         ))}
                                     </ul>
@@ -367,7 +407,7 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                     <ul className="flex flex-col gap-1">
                                         {form.files.map((f, i) => (
                                             <li key={i} className="text-sm text-indigo-600 font-medium flex items-center gap-2">
-                                                <span>📎</span>
+                                                <Icon name="paperclip" size={12} />
                                                 <span className="truncate">{f.name}</span>
                                                 <span className="text-xs text-gray-400">({(f.size / 1024 / 1024).toFixed(1)} MB)</span>
                                             </li>
@@ -377,13 +417,16 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                             )}
 
                             {submitError && (
-                                <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-sm text-rose-600">
-                                    ⚠️ {submitError}
+                                <div className="bg-rose-50 border border-rose-200 rounded-xl px-4 py-3 text-sm text-rose-600 flex items-center gap-2">
+                                    <Icon name="alert" size={14} />
+                                    {submitError}
                                 </div>
                             )}
 
                             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 flex gap-3">
-                                <span className="text-lg">ℹ️</span>
+                                <span className="text-amber-500 shrink-0 mt-0.5">
+                                    <Icon name="info" size={16} />
+                                </span>
                                 <p className="text-xs text-amber-700">
                                     Once submitted, your report will go to your <strong>department reviewer</strong> for Stage 1 review.
                                     You can track the status from your dashboard.
@@ -417,9 +460,15 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                 className="flex items-center gap-2 px-6 py-2 rounded-xl text-sm font-bold bg-emerald-600 hover:bg-emerald-700 text-white transition-colors shadow-md shadow-emerald-200 disabled:opacity-60"
                             >
                                 {submitting ? (
-                                    <><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Submitting…</>
+                                    <>
+                                        <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                                        Submitting…
+                                    </>
                                 ) : (
-                                    <>✓ Submit Report</>
+                                    <>
+                                        <Icon name="check" size={14} />
+                                        Submit Report
+                                    </>
                                 )}
                             </button>
                         )}

@@ -24,6 +24,7 @@ const Icon = ({ name, className = "w-4 h-4" }) => {
         save: <svg className={className} {...p}><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" /><polyline points="17 21 17 13 7 13 7 21" /><polyline points="7 3 7 8 15 8" /></svg>,
         check: <svg className={className} {...p}><polyline points="20 6 9 17 4 12" /></svg>,
         alert: <svg className={className} {...p}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="12" /><line x1="12" y1="16" x2="12.01" y2="16" /></svg>,
+        chevronDown: <svg className={className} {...p}><polyline points="6 9 12 15 18 9" /></svg>,
     };
     return icons[name] ?? null;
 };
@@ -221,53 +222,64 @@ export default function EditEmployeePage() {
 
                         {/* Role */}
                         <Field label="Role" icon="briefcase" error={errors.role}>
-                            <select
-                                value={form.role}
-                                onChange={e => handleChange("role", e.target.value)}
-                                className={`w-full px-3 py-2 text-sm rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 transition appearance-none ${errors.role ? "border-red-300" : "border-gray-200"
-                                    }`}
-                            >
-                                {ROLES.map(r => (
-                                    <option key={r.value} value={r.value}>{r.label}</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <select
+                                    value={form.role}
+                                    onChange={e => handleChange("role", e.target.value)}
+                                    className={`w-full px-3 py-2 text-sm rounded-lg border bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 transition appearance-none ${errors.role ? "border-red-300" : "border-gray-200"
+                                        }`}
+                                >
+                                    {ROLES.map(r => (
+                                        <option key={r.value} value={r.value}>{r.label}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                    <Icon name="chevronDown" className="w-3.5 h-3.5" />
+                                </div>
+                            </div>
                         </Field>
 
                         {/* Department */}
                         <Field label="Department" icon="building">
-                            <select
-                                value={form.dept_id}
-                                onChange={e => handleChange("dept_id", e.target.value)}
-                                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 transition appearance-none"
-                            >
-                                <option value="">No Department</option>
-                                {departments.map(d => (
-                                    <option key={d.dept_id} value={d.dept_id}>{d.name}</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <select
+                                    value={form.dept_id}
+                                    onChange={e => handleChange("dept_id", e.target.value)}
+                                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 transition appearance-none"
+                                >
+                                    <option value="">No Department</option>
+                                    {departments.map(d => (
+                                        <option key={d.dept_id} value={d.dept_id}>{d.name}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                    <Icon name="chevronDown" className="w-3.5 h-3.5" />
+                                </div>
+                            </div>
                         </Field>
 
                         {/* Team */}
                         <Field label="Team" icon="users">
-                            <select
-                                value={form.team_id}
-                                onChange={e => handleChange("team_id", e.target.value)}
-                                className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 transition appearance-none"
-                            >
-                                <option value="">No Team</option>
-                                {teams.map(t => (
-                                    <option key={t.team_id} value={t.team_id}>{t.name}</option>
-                                ))}
-                            </select>
+                            <div className="relative">
+                                <select
+                                    value={form.team_id}
+                                    onChange={e => handleChange("team_id", e.target.value)}
+                                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 transition appearance-none"
+                                >
+                                    <option value="">No Team</option>
+                                    {teams.map(t => (
+                                        <option key={t.team_id} value={t.team_id}>{t.name}</option>
+                                    ))}
+                                </select>
+                                <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+                                    <Icon name="chevronDown" className="w-3.5 h-3.5" />
+                                </div>
+                            </div>
                         </Field>
 
                         {/* Active status */}
                         <Field label="Status" icon="check">
                             <div className="flex items-center gap-3 h-[38px]">
-                                {/* Track: w-12 (48px), h-6 (24px). Thumb: w-5 h-5 (20px).
-                                    Padding inside track = 2px each side.
-                                    OFF: thumb at left = translateX(2px)
-                                    ON:  thumb at right = translateX(48 - 20 - 2 = 26px) → translate-x-[26px] */}
                                 <button
                                     type="button"
                                     role="switch"

@@ -102,6 +102,29 @@ const ALL_STATUSES = [
     "Rejected",
 ];
 
+// ✅ SVG icons — no emojis
+const GridIcon = () => (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <rect x="3" y="3" width="7" height="7" />
+        <rect x="14" y="3" width="7" height="7" />
+        <rect x="3" y="14" width="7" height="7" />
+        <rect x="14" y="14" width="7" height="7" />
+    </svg>
+);
+
+const TableIcon = () => (
+    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 6h18M3 12h18M3 18h18" />
+    </svg>
+);
+
+const EmptyIcon = () => (
+    <svg className="w-12 h-12 text-gray-300 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.25} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M22 12h-6l-2 3H10l-2-3H2" />
+        <path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" />
+    </svg>
+);
+
 export default function EmployeeReportsPage() {
     const { user } = useAuth();
     const [reports, setReports] = useState([]);
@@ -219,7 +242,7 @@ export default function EmployeeReportsPage() {
                     </div>
                 ) : (
                     <>
-                        {/* Status Filter Pills — hidden in table view (table has its own filters) */}
+                        {/* Status Filter Pills */}
                         {view === "grid" && (
                             <div className="flex flex-wrap gap-2 mb-6">
                                 <button
@@ -254,24 +277,25 @@ export default function EmployeeReportsPage() {
                             <p className="text-xs text-gray-400">
                                 {filtered.length} report{filtered.length !== 1 ? "s" : ""}
                             </p>
+                            {/* ✅ SVG icons in the Grid/Table toggle */}
                             <div className="flex gap-1 bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
                                 <button
                                     onClick={() => setView("grid")}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "grid"
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "grid"
                                         ? "bg-indigo-600 text-white"
                                         : "text-gray-500 hover:text-gray-900"
                                         }`}
                                 >
-                                    ⊞ Grid
+                                    <GridIcon /> Grid
                                 </button>
                                 <button
                                     onClick={() => setView("table")}
-                                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "table"
+                                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${view === "table"
                                         ? "bg-indigo-600 text-white"
                                         : "text-gray-500 hover:text-gray-900"
                                         }`}
                                 >
-                                    ☰ Table
+                                    <TableIcon /> Table
                                 </button>
                             </div>
                         </div>
@@ -279,8 +303,9 @@ export default function EmployeeReportsPage() {
                         {/* Grid View */}
                         {view === "grid" && (
                             filtered.length === 0 ? (
+                                // ✅ SVG icon in empty state
                                 <div className="text-center py-20 text-gray-400">
-                                    <div className="text-4xl mb-3">📭</div>
+                                    <EmptyIcon />
                                     <p className="font-medium">No reports with this status</p>
                                 </div>
                             ) : (

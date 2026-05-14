@@ -2,25 +2,32 @@
 
 /**
  * ReportStatusHistory — vertical timeline of a report's status journey.
- *
- * Accepts either:
- *  (a) Already-normalized report from EmployeeReportsPage (has history[] already built), OR
- *  (b) Raw backend report — will normalize on the fly
- *
- * Props:
- *  report: normalized report object (from normalizeReport() in EmployeeReportsPage)
- *  onClose?: () => void
- *  onResubmit?: () => void
  */
 
+// Inline SVG icons — all inherit currentColor
+function Icon({ name, size = 16 }) {
+    const s = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" };
+    switch (name) {
+        case "send": return <svg {...s}><path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4 20-7z" /></svg>;
+        case "search": return <svg {...s}><circle cx="11" cy="11" r="8" /><line x1="21" y1="21" x2="16.65" y2="16.65" /></svg>;
+        case "edit": return <svg {...s}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>;
+        case "refresh": return <svg {...s}><polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" /><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" /></svg>;
+        case "check-circle": return <svg {...s}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>;
+        case "star": return <svg {...s}><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" /></svg>;
+        case "x-circle": return <svg {...s}><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>;
+        case "dot": return <svg {...s}><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" /></svg>;
+        default: return <svg {...s}><circle cx="12" cy="12" r="4" fill="currentColor" stroke="none" /></svg>;
+    }
+}
+
 const STEP_META = {
-    "Submitted": { icon: "📤", dot: "bg-indigo-500" },
-    "Under Review": { icon: "🔍", dot: "bg-sky-500" },
-    "Changes Requested": { icon: "✏️", dot: "bg-violet-500" },
-    "Resubmitted": { icon: "🔄", dot: "bg-indigo-400" },
-    "Stage 1 Approved": { icon: "✅", dot: "bg-emerald-500" },
-    "Approved": { icon: "🎉", dot: "bg-emerald-600" },
-    "Rejected": { icon: "❌", dot: "bg-rose-500" },
+    "Submitted": { icon: "send", dot: "bg-indigo-500", color: "text-indigo-500" },
+    "Under Review": { icon: "search", dot: "bg-sky-500", color: "text-sky-500" },
+    "Changes Requested": { icon: "edit", dot: "bg-violet-500", color: "text-violet-500" },
+    "Resubmitted": { icon: "refresh", dot: "bg-indigo-400", color: "text-indigo-400" },
+    "Stage 1 Approved": { icon: "check-circle", dot: "bg-emerald-500", color: "text-emerald-500" },
+    "Approved": { icon: "star", dot: "bg-emerald-600", color: "text-emerald-600" },
+    "Rejected": { icon: "x-circle", dot: "bg-rose-500", color: "text-rose-500" },
 };
 
 const STATUS_BADGE = {
@@ -31,10 +38,10 @@ const STATUS_BADGE = {
     "Changes Requested": "bg-violet-100 text-violet-700",
 };
 
-const NEXT_STEP_TEXT = {
-    "Pending": { icon: "🔍", text: "Awaiting submission & Stage 1 review" },
-    "Under Review": { icon: "✅", text: "Awaiting reviewer decision (Stage 1)" },
-    "Changes Requested": { icon: "🔄", text: "Waiting for your resubmission" },
+const NEXT_STEP_META = {
+    "Pending": { icon: "search", text: "Awaiting submission & Stage 1 review" },
+    "Under Review": { icon: "check-circle", text: "Awaiting reviewer decision (Stage 1)" },
+    "Changes Requested": { icon: "refresh", text: "Waiting for your resubmission" },
 };
 
 export default function ReportStatusHistory({ report, onClose, onResubmit }) {
@@ -69,7 +76,7 @@ export default function ReportStatusHistory({ report, onClose, onResubmit }) {
                         onClick={onClose}
                         className="w-8 h-8 flex items-center justify-center rounded-xl bg-gray-100 hover:bg-gray-200 text-gray-500 transition-colors shrink-0"
                     >
-                        ✕
+                        <Icon name="x-circle" size={14} />
                     </button>
                 )}
             </div>
@@ -82,22 +89,19 @@ export default function ReportStatusHistory({ report, onClose, onResubmit }) {
                     <p className="text-sm text-gray-400 text-center py-8">No history available yet.</p>
                 ) : (
                     <div className="relative">
-                        {/* vertical connector */}
                         <div className="absolute left-[15px] top-3 bottom-3 w-px bg-gray-100" />
-
                         <ul className="flex flex-col gap-0">
                             {history.map((h, i) => {
-                                const meta = STEP_META[h.status] ?? { icon: "•", dot: "bg-gray-400" };
+                                const meta = STEP_META[h.status] ?? { icon: "dot", dot: "bg-gray-400", color: "text-gray-400" };
                                 const isLast = i === history.length - 1;
                                 const dotBorder = meta.dot.replace("bg-", "border-");
                                 const dotRing = meta.dot.replace("bg-", "ring-");
 
                                 return (
                                     <li key={i} className={`relative flex gap-4 ${isLast ? "pb-0" : "pb-6"}`}>
-                                        <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0 text-sm bg-white border-2 ${isLast ? `${dotBorder} shadow-md ring-4 ${dotRing}/20` : "border-gray-200"}`}>
-                                            {meta.icon}
+                                        <div className={`relative z-10 w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-white border-2 ${isLast ? `${dotBorder} shadow-md ring-4 ${dotRing}/20 ${meta.color}` : "border-gray-200 text-gray-400"}`}>
+                                            <Icon name={meta.icon} size={14} />
                                         </div>
-
                                         <div className="flex-1 pt-0.5 pb-1">
                                             <div className="flex items-center justify-between gap-2">
                                                 <span className={`text-sm font-bold ${isLast ? "text-[#0f1117]" : "text-gray-600"}`}>
@@ -123,14 +127,14 @@ export default function ReportStatusHistory({ report, onClose, onResubmit }) {
                 )}
 
                 {/* What happens next */}
-                {NEXT_STEP_TEXT[report.status] && (
+                {NEXT_STEP_META[report.status] && (
                     <div className="mt-4 border-t border-dashed border-gray-200 pt-4">
                         <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-3">What happens next</p>
                         <div className="flex items-center gap-3 opacity-50">
-                            <div className="w-8 h-8 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-sm shrink-0">
-                                {NEXT_STEP_TEXT[report.status].icon}
+                            <div className="w-8 h-8 rounded-full border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 shrink-0">
+                                <Icon name={NEXT_STEP_META[report.status].icon} size={14} />
                             </div>
-                            <p className="text-xs text-gray-500">{NEXT_STEP_TEXT[report.status].text}</p>
+                            <p className="text-xs text-gray-500">{NEXT_STEP_META[report.status].text}</p>
                         </div>
                     </div>
                 )}
@@ -142,9 +146,10 @@ export default function ReportStatusHistory({ report, onClose, onResubmit }) {
                     {report.status === "Changes Requested" && (
                         <button
                             onClick={onResubmit}
-                            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-md shadow-indigo-200"
+                            className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold rounded-xl transition-colors shadow-md shadow-indigo-200 flex items-center justify-center gap-2"
                         >
-                            ✏️ Resubmit with Changes
+                            <Icon name="edit" size={14} />
+                            Resubmit with Changes
                         </button>
                     )}
                     {report.status === "Rejected" && (

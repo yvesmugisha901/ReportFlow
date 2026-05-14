@@ -187,24 +187,20 @@ export default function AdminReportsPage() {
         }
     }, []);
 
-    // Load departments once on mount
     useEffect(() => {
         api.get("/departments")
             .then(res => setDepts(res.data.departments ?? res.data ?? []))
             .catch(() => { });
     }, []);
 
-    // Filter changes → reset to page 1
     useEffect(() => {
         isFilterChange.current = true;
         setPage(1);
     }, [search, statusFilter, deptFilter, dateFrom, dateTo]);
 
-    // Page or filter change → fetch
     useEffect(() => {
         load(page, search, statusFilter, deptFilter, dateFrom, dateTo);
         isFilterChange.current = false;
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, search, statusFilter, deptFilter, dateFrom, dateTo]);
 
     const hasDateFilter = dateFrom || dateTo;
@@ -236,8 +232,8 @@ export default function AdminReportsPage() {
                         </button>
                     </div>
 
-                    {/* Filters */}
-                    <div className="flex flex-wrap items-center gap-2 mb-4">
+                    {/* Filters Row */}
+                    <div className="flex flex-wrap items-center gap-3 mb-4">
 
                         {/* Search */}
                         <div className="relative">
@@ -245,14 +241,14 @@ export default function AdminReportsPage() {
                                 <Icon name="search" className="w-3.5 h-3.5" />
                             </span>
                             <input
-                                className="border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm w-52 placeholder:text-gray-400"
-                                placeholder="Search by title or employee…"
+                                className="border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm w-48 placeholder:text-gray-400"
+                                placeholder="Search reports…"
                                 value={search}
                                 onChange={e => setSearch(e.target.value)}
                             />
                         </div>
 
-                        {/* Status */}
+                        {/* Status Select */}
                         <div className="relative">
                             <select
                                 className="appearance-none border border-gray-200 rounded-lg pl-3 pr-7 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm"
@@ -269,7 +265,7 @@ export default function AdminReportsPage() {
                             </span>
                         </div>
 
-                        {/* Department */}
+                        {/* Dept Select */}
                         <div className="relative">
                             <select
                                 className="appearance-none border border-gray-200 rounded-lg pl-3 pr-7 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm"
@@ -278,9 +274,7 @@ export default function AdminReportsPage() {
                             >
                                 <option value="">All Departments</option>
                                 {departments.map(d => (
-                                    <option key={d.dept_id} value={String(d.dept_id)}>
-                                        {d.name}
-                                    </option>
+                                    <option key={d.dept_id} value={String(d.dept_id)}>{d.name}</option>
                                 ))}
                             </select>
                             <span className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
@@ -289,52 +283,55 @@ export default function AdminReportsPage() {
                         </div>
 
                         {/* Date From */}
-                        <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                                <Icon name="calendar" className="w-3.5 h-3.5" />
-                            </span>
-                            <input
-                                type="date"
-                                className="border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm text-gray-600"
-                                value={dateFrom}
-                                max={dateTo || undefined}
-                                onChange={e => setDateFrom(e.target.value)}
-                                title="From date"
-                            />
+                        <div className="flex items-center gap-2 border border-gray-200 bg-white rounded-lg px-2.5 py-1.5 shadow-sm">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">From</span>
+                            <div className="relative">
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                                    <Icon name="calendar" className="w-3 h-3" />
+                                </span>
+                                <input
+                                    type="date"
+                                    className="bg-transparent text-xs focus:outline-none text-gray-600 pl-4 w-28"
+                                    value={dateFrom}
+                                    max={dateTo || undefined}
+                                    onChange={e => setDateFrom(e.target.value)}
+                                />
+                            </div>
                         </div>
 
                         {/* Date To */}
-                        <div className="relative">
-                            <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                                <Icon name="calendar" className="w-3.5 h-3.5" />
-                            </span>
-                            <input
-                                type="date"
-                                className="border border-gray-200 rounded-lg pl-8 pr-3 py-1.5 text-xs bg-white focus:outline-none focus:ring-2 focus:ring-indigo-400 shadow-sm text-gray-600"
-                                value={dateTo}
-                                min={dateFrom || undefined}
-                                onChange={e => setDateTo(e.target.value)}
-                                title="To date"
-                            />
+                        <div className="flex items-center gap-2 border border-gray-200 bg-white rounded-lg px-2.5 py-1.5 shadow-sm">
+                            <span className="text-[10px] font-bold text-gray-400 uppercase">To</span>
+                            <div className="relative">
+                                <span className="absolute left-0 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                                    <Icon name="calendar" className="w-3 h-3" />
+                                </span>
+                                <input
+                                    type="date"
+                                    className="bg-transparent text-xs focus:outline-none text-gray-600 pl-4 w-28"
+                                    value={dateTo}
+                                    min={dateFrom || undefined}
+                                    onChange={e => setDateTo(e.target.value)}
+                                />
+                            </div>
                         </div>
 
-                        {/* Clear dates */}
+                        {/* Clear Button */}
                         {hasDateFilter && (
                             <button
                                 onClick={clearDates}
-                                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1.5 rounded-lg bg-indigo-50 text-indigo-600 hover:bg-indigo-100 font-medium transition-colors border border-indigo-100"
+                                className="flex items-center gap-1 text-[11px] px-2 py-1.5 rounded-lg bg-red-50 text-red-500 hover:bg-red-100 transition-colors border border-red-100"
                             >
                                 <Icon name="x" className="w-3 h-3" />
-                                Clear dates
                             </button>
                         )}
 
                         <span className="ml-auto text-xs text-gray-400">
-                            {loading ? "Loading…" : `${reports.length} report${reports.length !== 1 ? "s" : ""}`}
+                            {loading ? "Loading…" : `${reports.length} reports`}
                         </span>
                     </div>
 
-                    {/* Table */}
+                    {/* Table Area */}
                     <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
                         {loading ? (
                             <div className="flex items-center justify-center h-56 text-sm text-gray-400">Loading…</div>
@@ -344,7 +341,6 @@ export default function AdminReportsPage() {
                                     <Icon name="file" className="w-6 h-6 text-gray-300" />
                                 </div>
                                 <p className="text-sm font-medium">No reports found</p>
-                                <p className="text-xs mt-1">Try adjusting your filters.</p>
                             </div>
                         ) : (
                             <div className="overflow-x-auto">
@@ -352,9 +348,7 @@ export default function AdminReportsPage() {
                                     <thead>
                                         <tr className="border-b border-gray-100 bg-gray-50/80">
                                             {["Title", "Employee", "Department", "Submitted", "Status", "Late?", "File", "Actions"].map(h => (
-                                                <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">
-                                                    {h}
-                                                </th>
+                                                <th key={h} className="text-left px-4 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider whitespace-nowrap">{h}</th>
                                             ))}
                                         </tr>
                                     </thead>
@@ -362,80 +356,30 @@ export default function AdminReportsPage() {
                                         {reports.map(r => {
                                             const s = STATUS_STYLES[r.status] ?? STATUS_STYLES.pending;
                                             const dept = r.employee?.department?.name ?? r.dept_name ?? "—";
-                                            const fileUrl = r.file_path
-                                                ? `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}${r.file_path}`
-                                                : null;
-                                            const hasFile = !!fileUrl;
-
+                                            const fileUrl = r.file_path ? `${process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:5000"}${r.file_path}` : null;
                                             return (
                                                 <tr key={r.report_id} className="hover:bg-gray-50/60 transition-colors">
-
-                                                    <td className="px-4 py-3 font-medium text-gray-800 max-w-[200px] truncate whitespace-nowrap">
-                                                        {r.title}
-                                                    </td>
-
-                                                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                                                        {r.employee?.full_name ?? r.employee_name ?? "—"}
-                                                    </td>
-
-                                                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                                                        {dept}
-                                                    </td>
-
-                                                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-                                                        {r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : "—"}
-                                                    </td>
-
-                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                    <td className="px-4 py-3 font-medium text-gray-800 max-w-[200px] truncate">{r.title}</td>
+                                                    <td className="px-4 py-3 text-gray-500">{r.employee?.full_name ?? r.employee_name ?? "—"}</td>
+                                                    <td className="px-4 py-3 text-gray-500">{dept}</td>
+                                                    <td className="px-4 py-3 text-gray-500">{r.submitted_at ? new Date(r.submitted_at).toLocaleDateString() : "—"}</td>
+                                                    <td className="px-4 py-3">
                                                         <span className={`inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full ${s.bg} ${s.text}`}>
-                                                            <span className={`w-1.5 h-1.5 rounded-full ${s.dot} flex-shrink-0`} />
+                                                            <span className={`w-1.5 h-1.5 rounded-full ${s.dot}`} />
                                                             {s.label}
                                                         </span>
                                                     </td>
-
-                                                    <td className="px-4 py-3 whitespace-nowrap">
+                                                    <td className="px-4 py-3">
                                                         {r.is_late ? (
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-500">
-                                                                <Icon name="clock" className="w-3 h-3" /> Late
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-gray-300">—</span>
-                                                        )}
+                                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-red-50 text-red-500">Late</span>
+                                                        ) : <span className="text-gray-300">—</span>}
                                                     </td>
-
-                                                    <td className="px-4 py-3 whitespace-nowrap">
-                                                        {hasFile ? (
-                                                            <span className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
-                                                                <Icon name="file" className="w-3 h-3" /> File
-                                                            </span>
-                                                        ) : (
-                                                            <span className="text-gray-300 text-[10px]">No file</span>
-                                                        )}
+                                                    <td className="px-4 py-3">
+                                                        {fileUrl ? <Icon name="file" className="text-indigo-400" /> : <span className="text-gray-300">—</span>}
                                                     </td>
-
-                                                    <td className="px-4 py-3 whitespace-nowrap">
-                                                        <div className="flex items-center gap-1.5">
-                                                            <button
-                                                                type="button"
-                                                                onClick={() => setPreview(r)}
-                                                                className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-md border border-gray-200 text-gray-600 hover:border-indigo-300 hover:text-indigo-600 hover:bg-indigo-50/50 transition-colors font-medium"
-                                                            >
-                                                                <Icon name="eye" className="w-3 h-3" /> Review
-                                                            </button>
-                                                            {hasFile && (
-                                                                <a
-                                                                    href={fileUrl}
-                                                                    download={r.file_name ?? "report"}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    className="inline-flex items-center gap-1 text-[11px] px-2.5 py-1 rounded-md border border-gray-200 text-gray-600 hover:border-emerald-300 hover:text-emerald-600 hover:bg-emerald-50/50 transition-colors font-medium"
-                                                                >
-                                                                    <Icon name="download" className="w-3 h-3" /> Download
-                                                                </a>
-                                                            )}
-                                                        </div>
+                                                    <td className="px-4 py-3">
+                                                        <button onClick={() => setPreview(r)} className="text-indigo-600 font-medium hover:underline">Review</button>
                                                     </td>
-
                                                 </tr>
                                             );
                                         })}
@@ -444,31 +388,8 @@ export default function AdminReportsPage() {
                             </div>
                         )}
                     </div>
-
-                    {/* Pagination */}
-                    {totalPages > 1 && (
-                        <div className="flex items-center justify-center gap-2 mt-5">
-                            <button
-                                disabled={page === 1}
-                                onClick={() => setPage(p => p - 1)}
-                                className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
-                            >
-                                ← Prev
-                            </button>
-                            <span className="text-xs text-gray-500">Page {page} of {totalPages}</span>
-                            <button
-                                disabled={page === totalPages}
-                                onClick={() => setPage(p => p + 1)}
-                                className="px-3 py-1.5 text-xs border border-gray-200 rounded-lg disabled:opacity-40 hover:bg-gray-50 transition-colors"
-                            >
-                                Next →
-                            </button>
-                        </div>
-                    )}
-
                 </div>
             </div>
-
             {preview && <FileModal report={preview} onClose={() => setPreview(null)} />}
         </>
     );

@@ -133,12 +133,35 @@ export default function ReviewerDashboard() {
         }
     }
 
+    // ─── Drop this into ReviewerDashboard.jsx, replacing your existing stats block ───
+
+    const approvedCount = recentLogs.filter(r => r.action === "approved").length;
+    const rejectedCount = recentLogs.filter(r => r.action === "rejected").length;
+    const changesCount = recentLogs.filter(r => r.action === "changes_requested").length;
+    const underReview = recentLogs.filter(r => r.action === "under_review").length;
+    const totalSubmitted = pendingReports.length + recentLogs.length;
+
+    const totalOutcomes = approvedCount + rejectedCount;
+    const approvalRate = totalOutcomes > 0 ? Math.round((approvedCount / totalOutcomes) * 100) : 0;
+
+    const deptSubmitted = deptCompliance[0]?.submitted ?? 0;
+    const deptTotal = deptCompliance[0]?.total ?? 1;
+    // ✅ Math.min(100) prevents values like 300% when submitted > total
+    const deptPct = deptTotal > 0 ? Math.min(100, Math.round((deptSubmitted / deptTotal) * 100)) : 0;
+
     const stats = [
         { label: "Awaiting Review", value: pendingReports.length, icon: "hourglass", color: "amber" },
-        { label: "Reviewed", value: recentLogs.length, icon: "approved", color: "emerald" },
-        { label: "Dept. Submitted", value: pendingReports.length + recentLogs.length, icon: "inbox", color: "indigo" },
-        { label: "Dept. Approved", value: recentLogs.filter(r => r.action === "approved").length, icon: "chart", color: "violet" },
+        { label: "Under Review", value: underReview, icon: "eye", color: "sky" },
+        { label: "Changes Requested", value: changesCount, icon: "pencil", color: "violet" },
+        { label: "Total Submitted", value: totalSubmitted, icon: "inbox", color: "indigo" },
+        { label: "Approved", value: approvedCount, icon: "check", color: "emerald" },
+        { label: "Rejected", value: rejectedCount, icon: "rejected", color: "rose" },
+        { label: "Approval Rate", value: `${approvalRate}%`, icon: "chart", color: "teal" },
+        { label: "Dept. Compliance", value: `${deptPct}%`, icon: "compliance", color: "violet" },
     ];
+
+    // ─── Then update the StatsGrid call to cols={8} ───
+    // <StatsGrid stats={stats} cols={8} />
 
     const firstName = user?.full_name?.split(" ")[0] ?? "Reviewer";
 

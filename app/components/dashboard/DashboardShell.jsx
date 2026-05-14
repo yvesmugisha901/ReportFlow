@@ -6,27 +6,27 @@ import { useAuth } from "@/context/AuthContext";
 
 const NAV = {
     admin: [
-        { label: "Overview", href: "/dashboard/admin", icon: "⊞" },
-        { label: "Departments", href: "/dashboard/admin/departments", icon: "🏢" },
-        { label: "Teams", href: "/dashboard/admin/teams", icon: "👥" },
-        { label: "Schedules", href: "/dashboard/admin/schedules", icon: "🗓️" },
-        { label: "Reports", href: "/dashboard/admin/reports", icon: "📋" },
-        { label: "Employees", href: "/dashboard/admin/employees", icon: "👤" },
+        { label: "Overview", href: "/dashboard/admin", icon: "grid" },
+        { label: "Departments", href: "/dashboard/admin/departments", icon: "building" },
+        { label: "Teams", href: "/dashboard/admin/teams", icon: "users" },
+        { label: "Schedules", href: "/dashboard/admin/schedules", icon: "calendar" },
+        { label: "Reports", href: "/dashboard/admin/reports", icon: "file-text" },
+        { label: "Employees", href: "/dashboard/admin/employees", icon: "user" },
     ],
     employee: [
-        { label: "Overview", href: "/dashboard/employee", icon: "⊞" },
-        { label: "My Reports", href: "/dashboard/employee/reports", icon: "📋" },
-        { label: "Submit Report", href: "/dashboard/employee/reports/new", icon: "➕" },
+        { label: "Overview", href: "/dashboard/employee", icon: "grid" },
+        { label: "My Reports", href: "/dashboard/employee/reports", icon: "file-text" },
+        { label: "Submit Report", href: "/dashboard/employee/reports/new", icon: "plus-circle" },
     ],
     reviewer: [
-        { label: "Overview", href: "/dashboard/reviewer", icon: "⊞" },
-        { label: "Review Queue", href: "/dashboard/reviewer/queue", icon: "📥" },
-        { label: "History", href: "/dashboard/reviewer/history", icon: "🕓" },
+        { label: "Overview", href: "/dashboard/reviewer", icon: "grid" },
+        { label: "Review Queue", href: "/dashboard/reviewer/queue", icon: "inbox" },
+        { label: "History", href: "/dashboard/reviewer/history", icon: "clock" },
     ],
     approver: [
-        { label: "Overview", href: "/dashboard/approver", icon: "⊞" },
-        { label: "Approvals", href: "/dashboard/approver/approvals", icon: "✅" },
-        { label: "History", href: "/dashboard/approver/history", icon: "🕓" },
+        { label: "Overview", href: "/dashboard/approver", icon: "grid" },
+        { label: "Approvals", href: "/dashboard/approver/approvals", icon: "check-circle" },
+        { label: "History", href: "/dashboard/approver/history", icon: "clock" },
     ],
 };
 
@@ -35,6 +35,23 @@ const ROLE_LABELS = { admin: "Admin", employee: "Employee", reviewer: "Reviewer"
 function getInitials(name) {
     return (name ?? "U").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
 }
+
+const Icon = ({ name }) => {
+    const S = { width: 16, height: 16, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "1.75", strokeLinecap: "round", strokeLinejoin: "round" };
+    switch (name) {
+        case "grid": return <svg {...S}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>;
+        case "building": return <svg {...S}><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4" /></svg>;
+        case "users": return <svg {...S}><path d="M16 11c1.657 0 3-1.343 3-3s-1.343-3-3-3M20 21c0-2.21-1.79-4-4-4M1 21c0-2.761 2.239-5 5-5h6c2.761 0 5 2.239 5 5" /><circle cx="9" cy="7" r="4" /></svg>;
+        case "calendar": return <svg {...S}><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>;
+        case "file-text": return <svg {...S}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>;
+        case "user": return <svg {...S}><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>;
+        case "plus-circle": return <svg {...S}><circle cx="12" cy="12" r="10" /><line x1="12" y1="8" x2="12" y2="16" /><line x1="8" y1="12" x2="16" y2="12" /></svg>;
+        case "inbox": return <svg {...S}><polyline points="22 12 16 12 14 15 10 15 8 12 2 12" /><path d="M5.45 5.11L2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z" /></svg>;
+        case "clock": return <svg {...S}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>;
+        case "check-circle": return <svg {...S}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>;
+        default: return <svg {...S}><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></svg>;
+    }
+};
 
 export default function DashboardShell({ children }) {
     const { user, logout } = useAuth();
@@ -65,7 +82,9 @@ export default function DashboardShell({ children }) {
                                 : "text-white/60 hover:bg-white/10 hover:text-white"
                             }`}
                     >
-                        <span className="text-base flex-shrink-0 w-5 text-center">{item.icon}</span>
+                        <span className="flex-shrink-0 w-4 flex items-center justify-center">
+                            <Icon name={item.icon} />
+                        </span>
                         {!collapsed && <span>{item.label}</span>}
                         {active && !collapsed && <span className="ml-auto w-1.5 h-1.5 rounded-full bg-white" />}
                     </Link>

@@ -2,6 +2,34 @@
 import { useState, useEffect } from "react";
 import { getDepartments, createDepartment, updateDepartment, deleteDepartment, getUsers } from "@/lib/api/admin.api";
 
+const BuildingIcon = () => (
+    <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M3 21h18" />
+        <path d="M5 21V7l7-4 7 4v14" />
+        <path d="M9 21v-4h6v4" />
+        <rect x="9" y="10" width="2" height="2" />
+        <rect x="13" y="10" width="2" height="2" />
+        <rect x="9" y="14" width="2" height="2" />
+        <rect x="13" y="14" width="2" height="2" />
+    </svg>
+);
+
+const UserIcon = () => (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+        <circle cx="12" cy="7" r="4" />
+    </svg>
+);
+
+const TeamIcon = () => (
+    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+        <circle cx="9" cy="7" r="4" />
+        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+    </svg>
+);
+
 function Modal({ open, onClose, children }) {
     if (!open) return null;
     return (
@@ -31,12 +59,9 @@ export default function DepartmentsPage() {
             setError(null);
             const [deptData, userData] = await Promise.all([
                 getDepartments(),
-                // fetch only reviewers for the assign dropdown
                 getUsers({ role: "reviewer" }),
             ]);
-            // backend: { success, count, departments }
             setDepartments(deptData.departments ?? []);
-            // backend: { success, count, users }
             setReviewers(userData.users ?? []);
         } catch {
             setError("Failed to load departments.");
@@ -59,7 +84,6 @@ export default function DepartmentsPage() {
         setForm({
             name: dept.name,
             description: dept.description ?? "",
-            // backend returns dept.reviewer_id as the FK
             reviewer_id: dept.reviewer_id ?? "",
         });
         setFormError("");
@@ -151,7 +175,10 @@ export default function DepartmentsPage() {
                             <div key={dept.dept_id} className="bg-white border border-gray-200 rounded-2xl p-5 shadow-sm hover:shadow-md transition-shadow">
                                 {/* Card header */}
                                 <div className="flex items-start justify-between mb-3">
-                                    <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center text-xl">🏢</div>
+                                    {/* ✅ SVG icon instead of emoji */}
+                                    <div className="w-10 h-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+                                        <BuildingIcon />
+                                    </div>
                                     <div className="flex gap-2">
                                         <button
                                             onClick={() => openEdit(dept)}
@@ -176,17 +203,19 @@ export default function DepartmentsPage() {
 
                                 {/* Meta row */}
                                 <div className="border-t border-gray-100 pt-3 space-y-1.5">
-                                    {/* Reviewer — backend includes dept.reviewer object directly */}
+                                    {/* ✅ SVG icon for Reviewer */}
                                     <div className="flex items-center gap-2 text-xs text-gray-500">
-                                        <span> Reviewer:</span>
+                                        <UserIcon />
+                                        <span>Reviewer:</span>
                                         <span className="font-medium text-gray-700">
                                             {dept.reviewer?.full_name ?? "Not assigned"}
                                         </span>
                                     </div>
 
-                                    {/* Teams count — backend includes dept.teams array */}
+                                    {/* ✅ SVG icon for Teams */}
                                     <div className="flex items-center gap-2 text-xs text-gray-500">
-                                        <span> Teams:</span>
+                                        <TeamIcon />
+                                        <span>Teams:</span>
                                         <span className="font-medium text-gray-700">
                                             {dept.teams?.length
                                                 ? dept.teams.map(t => t.name).join(", ")
@@ -269,7 +298,6 @@ export default function DepartmentsPage() {
             {/* Delete Confirm Modal */}
             <Modal open={!!deleteModal} onClose={() => setDeleteModal(null)}>
                 <div className="text-center">
-
                     <h2 className="text-lg font-bold text-gray-900 mb-2">Delete Department?</h2>
                     <p className="text-sm text-gray-500 mb-6">
                         This will permanently delete <strong>{deleteModal?.name}</strong>. This cannot be undone.
