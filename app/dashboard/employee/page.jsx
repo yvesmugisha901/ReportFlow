@@ -63,78 +63,25 @@ function normalizeSchedule(s) {
     };
 }
 
-// Stat card config
+/** Build the prefill object ReportForm expects from a schedule */
+function buildPrefill(schedule) {
+    if (!schedule) return null;
+    return {
+        scheduleId: schedule.id,           // used by ReportForm to lock the schedule
+        reportType: schedule.reportType,
+        department: schedule.department,
+        frequency: schedule.frequency,
+    };
+}
+
 const STAT_CARDS = [
-    {
-        key: "total",
-        label: "Total Reports",
-        icon: "reports",
-        bg: "bg-indigo-50",
-        iconColor: "text-indigo-500",
-        iconBg: "bg-indigo-100",
-        valueColor: "text-indigo-700",
-        border: "border-indigo-100",
-    },
-    {
-        key: "approved",
-        label: "Approved",
-        icon: "check",
-        bg: "bg-emerald-50",
-        iconColor: "text-emerald-500",
-        iconBg: "bg-emerald-100",
-        valueColor: "text-emerald-700",
-        border: "border-emerald-100",
-    },
-    {
-        key: "submitted",
-        label: "Submitted",
-        icon: "send",
-        bg: "bg-sky-50",
-        iconColor: "text-sky-500",
-        iconBg: "bg-sky-100",
-        valueColor: "text-sky-700",
-        border: "border-sky-100",
-    },
-    {
-        key: "under_review",
-        label: "Under Review",
-        icon: "eye",
-        bg: "bg-violet-50",
-        iconColor: "text-violet-500",
-        iconBg: "bg-violet-100",
-        valueColor: "text-violet-700",
-        border: "border-violet-100",
-    },
-    {
-        key: "pending",
-        label: "Pending",
-        icon: "clock",
-        bg: "bg-amber-50",
-        iconColor: "text-amber-500",
-        iconBg: "bg-amber-100",
-        valueColor: "text-amber-700",
-        border: "border-amber-100",
-    },
-    {
-        key: "changes",
-        label: "Changes Requested",
-        icon: "edit",
-        bg: "bg-orange-50",
-        iconColor: "text-orange-500",
-        iconBg: "bg-orange-100",
-        valueColor: "text-orange-700",
-        border: "border-orange-100",
-    },
-    {
-        key: "rejected",
-        label: "Rejected",
-        icon: "x",
-        bg: "bg-rose-50",
-        iconColor: "text-rose-500",
-        iconBg: "bg-rose-100",
-        valueColor: "text-rose-700",
-        border: "border-rose-100",
-    },
+    { key: "total", label: "Total Reports", icon: "reports", bg: "bg-indigo-50", iconColor: "text-indigo-500", iconBg: "bg-indigo-100", valueColor: "text-indigo-700", border: "border-indigo-100" },
+    { key: "approved", label: "Approved", icon: "check", bg: "bg-emerald-50", iconColor: "text-emerald-500", iconBg: "bg-emerald-100", valueColor: "text-emerald-700", border: "border-emerald-100" },
+    { key: "submitted", label: "Submitted", icon: "send", bg: "bg-sky-50", iconColor: "text-sky-500", iconBg: "bg-sky-100", valueColor: "text-sky-700", border: "border-sky-100" },
+    { key: "under_review", label: "Under Review", icon: "eye", bg: "bg-violet-50", iconColor: "text-violet-500", iconBg: "bg-violet-100", valueColor: "text-violet-700", border: "border-violet-100" },
+    { key: "pending", label: "Pending", icon: "clock", bg: "bg-amber-50", iconColor: "text-amber-500", iconBg: "bg-amber-100", valueColor: "text-amber-700", border: "border-amber-100" },
+    { key: "changes", label: "Changes Requested", icon: "edit", bg: "bg-orange-50", iconColor: "text-orange-500", iconBg: "bg-orange-100", valueColor: "text-orange-700", border: "border-orange-100" },
+    { key: "rejected", label: "Rejected", icon: "x", bg: "bg-rose-50", iconColor: "text-rose-500", iconBg: "bg-rose-100", valueColor: "text-rose-700", border: "border-rose-100" },
 ];
 
 export default function EmployeeDashboard() {
@@ -206,13 +153,7 @@ export default function EmployeeDashboard() {
             "Rejected": { type: "changes", message: "Report rejected:" },
         };
         const meta = typeMap[r.status] ?? { type: "submitted", message: "Report:" };
-        return {
-            id: r.id,
-            type: meta.type,
-            message: meta.message,
-            reportTitle: r.title,
-            time: r.submittedAt ?? "—",
-        };
+        return { id: r.id, type: meta.type, message: meta.message, reportTitle: r.title, time: r.submittedAt ?? "—" };
     });
 
     async function handleFormSubmit(formData) {
@@ -224,13 +165,21 @@ export default function EmployeeDashboard() {
         load();
     }
 
+    /** Called from the Upcoming Deadlines list — always has full schedule info */
     function handleSubmitFromSchedule(schedule) {
-        setPrefill({
-            reportType: schedule.reportType,
-            department: schedule.department,
-            frequency: schedule.frequency,
-            schedule_id: schedule.id,
-        });
+        setPrefill(buildPrefill(schedule));
+        setShowForm(true);
+    }
+
+    /** Called from the banner — prefills from nextDue if available */
+    function handleBannerSubmit() {
+        setPrefill(buildPrefill(nextDue ?? null));
+        setShowForm(true);
+    }
+
+    /** Plain "Submit Report" button in the header — no prefill */
+    function handleNewReport() {
+        setPrefill(null);
         setShowForm(true);
     }
 
@@ -238,7 +187,6 @@ export default function EmployeeDashboard() {
 
     return (
         <div className="min-h-screen bg-[#f8f9fc] text-[#0f1117]">
-            {/* Ambient blobs */}
             <div className="fixed inset-0 pointer-events-none overflow-hidden z-0">
                 <div className="absolute -top-40 right-0 w-[500px] h-[500px] rounded-full bg-sky-100 blur-[120px]" />
                 <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full bg-indigo-100 blur-[100px]" />
@@ -256,7 +204,7 @@ export default function EmployeeDashboard() {
                         <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">My Dashboard</h1>
                     </div>
                     <button
-                        onClick={() => { setPrefill(null); setShowForm(true); }}
+                        onClick={handleNewReport}
                         className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-indigo-200"
                     >
                         <Icon name="plus" className="w-4 h-4" />
@@ -289,13 +237,18 @@ export default function EmployeeDashboard() {
                                         </>
                                     ) : nextDue ? (
                                         <>
-                                            <p className="text-sm font-bold text-amber-800">Upcoming: {nextDue.reportType}</p>
-                                            <p className="text-xs text-amber-600">Due {new Date(nextDue.dueDate).toLocaleDateString()}</p>
+                                            <p className="text-sm font-bold text-amber-800">
+                                                Upcoming: {nextDue.reportType}
+                                            </p>
+                                            <p className="text-xs text-amber-600">
+                                                Due {new Date(nextDue.dueDate).toLocaleDateString()}
+                                            </p>
                                         </>
                                     ) : null}
                                 </div>
+                                {/* ✅ Banner button now carries the schedule info into the form */}
                                 <button
-                                    onClick={() => { setPrefill(null); setShowForm(true); }}
+                                    onClick={handleBannerSubmit}
                                     className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors flex-shrink-0"
                                 >
                                     Submit Now
@@ -303,7 +256,7 @@ export default function EmployeeDashboard() {
                             </div>
                         )}
 
-                        {/* Stats — 4 cols on lg, 2 on sm, all 7 cards */}
+                        {/* Stats */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3 mb-6">
                             {STAT_CARDS.map((card) => (
                                 <div
@@ -324,9 +277,10 @@ export default function EmployeeDashboard() {
                                 </div>
                             ))}
 
-                            {/* 8th cell: quick submit CTA — fills the row nicely */}
-                            <div className="bg-indigo-600 rounded-2xl p-4 flex flex-col justify-between cursor-pointer hover:bg-indigo-700 transition-colors"
-                                onClick={() => { setPrefill(null); setShowForm(true); }}>
+                            <div
+                                className="bg-indigo-600 rounded-2xl p-4 flex flex-col justify-between cursor-pointer hover:bg-indigo-700 transition-colors"
+                                onClick={handleNewReport}
+                            >
                                 <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
                                     <Icon name="plus" className="w-4 h-4 text-white" />
                                 </div>
@@ -337,18 +291,11 @@ export default function EmployeeDashboard() {
                             </div>
                         </div>
 
-                        {/* Bottom Grid: Activity + Schedules */}
+                        {/* Bottom Grid */}
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                            {/* Recent Activity — takes 2 cols */}
                             <div className="lg:col-span-2">
-                                <ActivityFeed
-                                    activities={activities}
-                                    title="Recent Activity"
-                                    maxItems={8}
-                                />
+                                <ActivityFeed activities={activities} title="Recent Activity" maxItems={8} />
                             </div>
-
-                            {/* Upcoming Deadlines */}
                             <div>
                                 <ScheduleList
                                     schedules={schedules}
@@ -370,4 +317,4 @@ export default function EmployeeDashboard() {
             )}
         </div>
     );
-}
+}   

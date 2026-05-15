@@ -10,7 +10,6 @@ function capitalize(str) {
     return str.charAt(0).toUpperCase() + str.slice(1).replace(/_/g, "-");
 }
 
-// Inline SVG icons
 function Icon({ name, size = 16 }) {
     const s = { width: size, height: size, viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round" };
     switch (name) {
@@ -25,15 +24,32 @@ function Icon({ name, size = 16 }) {
         case "building": return <svg {...s}><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-4h6v4" /></svg>;
         case "users": return <svg {...s}><path d="M16 11c1.657 0 3-1.343 3-3s-1.343-3-3-3M20 21c0-2.21-1.79-4-4-4M1 21c0-2.761 2.239-5 5-5h6c2.761 0 5 2.239 5 5" /><circle cx="9" cy="7" r="4" /></svg>;
         case "calendar": return <svg {...s}><rect x="3" y="4" width="18" height="18" rx="2" /><path d="M16 2v4M8 2v4M3 10h18" /></svg>;
+        case "lock": return <svg {...s}><rect x="3" y="11" width="18" height="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>;
         case "loader": return <svg {...s} style={{ animation: "spin 1s linear infinite" }}><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83" /></svg>;
         default: return null;
     }
+}
+
+/**
+ * Determine if a schedule applies to this employee.
+ * A schedule is "assigned" when:
+ *   - its dept_id matches the employee's dept, OR
+ *   - its team_id matches the employee's team
+ * A null/undefined dept_id + team_id means it's org-wide (also applies).
+ */
+function scheduleAppliesTo(schedule, user) {
+    const hasDeptMatch = schedule.dept_id && String(schedule.dept_id) === String(user?.dept_id);
+    const hasTeamMatch = schedule.team_id && String(schedule.team_id) === String(user?.team_id);
+    const isOrgWide = !schedule.dept_id && !schedule.team_id;
+    return hasDeptMatch || hasTeamMatch || isOrgWide;
 }
 
 export default function ReportForm({ prefill = null, onClose, onSubmit }) {
     const { user } = useAuth();
     const [schedules, setSchedules] = useState([]);
     const [loadingSchedules, setLoadingSchedules] = useState(true);
+    // The single schedule assigned to this employee by the admin (if any)
+    const [assignedSchedule, setAssignedSchedule] = useState(null);
 
     const [step, setStep] = useState(1);
     const [submitting, setSubmitting] = useState(false);
@@ -61,8 +77,35 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                 const res = await api.get("/schedules");
                 const list = res.data.schedules ?? res.data ?? [];
                 setSchedules(list);
-                if (prefill?.frequency) {
-                    const match = list.find(s =>
+
+                // Filter to schedules that apply to this employee
+                const applicable = list.filter(s => scheduleAppliesTo(s, user));
+
+                if (applicable.length === 1) {
+                    // Exactly one schedule assigned — auto-select and lock it
+                    const auto = applicable[0];
+                    setAssignedSchedule(auto);
+                    setForm(f => ({
+                        ...f,
+                        schedule_id: auto.schedule_id,
+                        frequency: auto.frequency?.toLowerCase() ?? f.frequency,
+                    }));
+                } else if (prefill?.scheduleId) {
+                    // Caller passed a specific schedule (e.g. from "Submit" button on a schedule card)
+                    const match = list.find(s => String(s.schedule_id) === String(prefill.scheduleId));
+                    if (match) {
+                        setAssignedSchedule(match);
+                        setForm(f => ({
+                            ...f,
+                            schedule_id: match.schedule_id,
+                            frequency: match.frequency?.toLowerCase() ?? f.frequency,
+                        }));
+                    }
+                } else if (prefill?.frequency) {
+                    // Legacy: match by frequency keyword
+                    const match = applicable.find(s =>
+                        s.frequency?.toLowerCase() === prefill.frequency?.toLowerCase()
+                    ) ?? list.find(s =>
                         s.frequency?.toLowerCase() === prefill.frequency?.toLowerCase()
                     );
                     if (match) {
@@ -70,13 +113,13 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                     }
                 }
             } catch {
-                // schedules optional
+                // schedules optional — form still works without them
             } finally {
                 setLoadingSchedules(false);
             }
         };
         load();
-    }, []);
+    }, [user]);
 
     function set(field, value) {
         setForm((f) => ({ ...f, [field]: value }));
@@ -86,10 +129,10 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
 
     function handleScheduleChange(scheduleId) {
         set("schedule_id", scheduleId);
-        if (scheduleId) {
-            const s = schedules.find(s => String(s.schedule_id) === String(scheduleId));
-            if (s?.frequency) set("frequency", s.frequency);
-        }
+        const s = schedules.find(s => String(s.schedule_id) === String(scheduleId));
+        // Always apply the schedule's frequency (overrides any manual selection)
+        // If deselected, clear frequency so user must pick manually
+        set("frequency", s?.frequency?.toLowerCase() ?? "");
     }
 
     function validateStep1() {
@@ -156,6 +199,11 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
 
     const STEPS = ["Details", "Content", "Review & Submit"];
     const selectedSchedule = schedules.find(s => String(s.schedule_id) === String(form.schedule_id));
+    // Lock the schedule field tile when admin assigned exactly one schedule
+    const scheduleIsLocked = !!assignedSchedule;
+    // Lock frequency buttons whenever ANY schedule is selected (schedule owns the frequency)
+    // Lock if a loaded schedule has frequency, OR if prefill came with scheduleId+frequency (before schedules load)
+    const frequencyIsLocked = !!selectedSchedule?.frequency || !!(prefill?.scheduleId && prefill?.frequency);
 
     return (
         <div
@@ -219,10 +267,38 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                     {/* STEP 1 — Details */}
                     {!submitted && step === 1 && (
                         <div className="flex flex-col gap-4">
-                            <Field label="Report Schedule" hint="Optional — links to a deadline">
+
+                            {/* ── Schedule field ──────────────────────────────── */}
+                            <Field label="Report Schedule" hint={scheduleIsLocked ? undefined : "Optional — links to a deadline"}>
                                 {loadingSchedules ? (
                                     <div className="text-xs text-gray-400 py-2">Loading schedules…</div>
+                                ) : scheduleIsLocked ? (
+                                    /*
+                                     * LOCKED — admin assigned exactly one schedule to this employee.
+                                     * Show it as a read-only tile so the employee sees what was set,
+                                     * but cannot change it.
+                                     */
+                                    <div className="flex items-center gap-3 px-4 py-3 bg-indigo-50 border border-indigo-200 rounded-xl">
+                                        <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center text-indigo-500 shrink-0">
+                                            <Icon name="lock" size={14} />
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-sm font-semibold text-indigo-800 truncate">
+                                                {assignedSchedule.title ?? `Schedule #${assignedSchedule.schedule_id}`}
+                                            </p>
+                                            <p className="text-xs text-indigo-500 mt-0.5">
+                                                {[
+                                                    assignedSchedule.frequency ? capitalize(assignedSchedule.frequency) : null,
+                                                    assignedSchedule.deadline ? `Due ${new Date(assignedSchedule.deadline).toLocaleDateString()}` : null,
+                                                ].filter(Boolean).join(" · ")}
+                                            </p>
+                                        </div>
+                                        <span className="text-[10px] font-bold text-indigo-400 uppercase tracking-wide shrink-0">
+                                            Set by admin
+                                        </span>
+                                    </div>
                                 ) : (
+                                    /* FREE CHOICE — employee picks from their applicable schedules */
                                     <select
                                         value={form.schedule_id}
                                         onChange={(e) => handleScheduleChange(e.target.value)}
@@ -240,7 +316,8 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                 )}
                             </Field>
 
-                            {selectedSchedule && (
+                            {/* Schedule detail strip (only shown in free-choice mode when something is selected) */}
+                            {!scheduleIsLocked && selectedSchedule && (
                                 <div className="bg-indigo-50 rounded-xl px-4 py-3 text-xs text-indigo-700 flex flex-wrap gap-x-4 gap-y-1">
                                     {selectedSchedule.department?.name && (
                                         <span className="flex items-center gap-1.5">
@@ -263,18 +340,31 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                 </div>
                             )}
 
+                            {/* ── Frequency ────────────────────────────────────── */}
                             <Field label="Frequency" error={errors.frequency} required>
                                 <div className="flex flex-wrap gap-2">
-                                    {FREQUENCIES.map((f) => (
-                                        <button
-                                            key={f}
-                                            type="button"
-                                            onClick={() => set("frequency", f)}
-                                            className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors ${form.frequency === f ? "bg-indigo-600 text-white border-indigo-600" : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"}`}
-                                        >
-                                            {capitalize(f)}
-                                        </button>
-                                    ))}
+                                    {FREQUENCIES.map((f) => {
+                                        const isActive = form.frequency === f;
+                                        // Lock frequency when any schedule with a frequency is selected
+                                        const locked = frequencyIsLocked;
+                                        return (
+                                            <button
+                                                key={f}
+                                                type="button"
+                                                disabled={locked}
+                                                onClick={() => !locked && set("frequency", f)}
+                                                className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors
+                                                    ${isActive
+                                                        ? "bg-indigo-600 text-white border-indigo-600"
+                                                        : locked
+                                                            ? "bg-gray-50 text-gray-300 border-gray-100 cursor-not-allowed"
+                                                            : "bg-white text-gray-600 border-gray-200 hover:border-indigo-300"
+                                                    }`}
+                                            >
+                                                {capitalize(f)}
+                                            </button>
+                                        );
+                                    })}
                                 </div>
                                 {errors.frequency && <p className="text-xs text-rose-500 mt-1">{errors.frequency}</p>}
                             </Field>
@@ -349,9 +439,7 @@ export default function ReportForm({ prefill = null, onClose, onSubmit }) {
                                                 <div className="flex items-center gap-2 min-w-0">
                                                     <span className="text-indigo-400"><Icon name="paperclip" size={12} /></span>
                                                     <span className="text-xs font-medium text-indigo-700 truncate">{f.name}</span>
-                                                    <span className="text-[10px] text-gray-400 shrink-0">
-                                                        ({(f.size / 1024 / 1024).toFixed(1)} MB)
-                                                    </span>
+                                                    <span className="text-[10px] text-gray-400 shrink-0">({(f.size / 1024 / 1024).toFixed(1)} MB)</span>
                                                 </div>
                                                 <button onClick={() => removeFile(i)} className="text-rose-400 hover:text-rose-600 ml-2 shrink-0">
                                                     <Icon name="x" size={12} />
