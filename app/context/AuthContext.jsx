@@ -9,49 +9,54 @@ const AuthContext = createContext(null);
 export function AuthProvider({ children }) {
     const [user, setUser] = useState(null);
     const [token, setToken] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(true); // stays true until auth is confirmed
     const router = useRouter();
 
-    // On mount: restore session from localStorage, then always re-fetch
-    // fresh user data (so nested department/team is never stale)
     useEffect(() => {
         const storedToken = localStorage.getItem("token");
         const storedUser = localStorage.getItem("user");
 
-        if (storedToken && storedUser) {
-            try {
-                // Optimistically set from cache so the UI renders immediately
-                setToken(storedToken);
-                setUser(JSON.parse(storedUser));
-
-                // ✅ Always re-fetch to get fresh nested data (department.name, team.name)
-                getMe()
-                    .then((data) => {
-                        const fresh = data.user ?? data;
-                        setUser(fresh);
-                        localStorage.setItem("user", JSON.stringify(fresh));
-                    })
-                    .catch(() => {
-                        // Token is invalid / expired — clear session
-                        localStorage.removeItem("token");
-                        localStorage.removeItem("user");
-                        setToken(null);
-                        setUser(null);
-                    });
-            } catch {
-                // Corrupted localStorage data — clear it
-                localStorage.removeItem("token");
-                localStorage.removeItem("user");
-            }
+        if (!storedToken || !storedUser) {
+            // No session at all — done immediately
+            setLoading(false);
+            return;
         }
 
-        setLoading(false);
+        // Optimistically hydrate from cache so UI has something to render
+        try {
+            setToken(storedToken);
+            setUser(JSON.parse(storedUser));
+        } catch {
+            localStorage.removeItem("token");
+            localStorage.removeItem("user");
+            setLoading(false);
+            return;
+        }
+
+        // Always re-validate with the server — setLoading(false) ONLY after this settles.
+        // This prevents NotificationsContext (and any other consumer) from firing
+        // authenticated requests before we know the token is actually valid.
+        getMe()
+            .then((data) => {
+                const fresh = data.user ?? data;
+                setUser(fresh);
+                localStorage.setItem("user", JSON.stringify(fresh));
+            })
+            .catch(() => {
+                // Token expired or invalid — clear everything
+                localStorage.removeItem("token");
+                localStorage.removeItem("user");
+                setToken(null);
+                setUser(null);
+            })
+            .finally(() => {
+                // Auth is now settled (valid or cleared) — allow consumers to proceed
+                setLoading(false);
+            });
     }, []);
 
     const login = useCallback(async ({ email, password }) => {
-        // loginUser returns { token, user } — user now includes nested department
         const data = await loginUser({ email, password });
-
         const { token: newToken, user: newUser } = data;
 
         localStorage.setItem("token", newToken);
@@ -64,12 +69,13 @@ export function AuthProvider({ children }) {
 
     const logout = useCallback(() => {
         logoutUser();
+        localStorage.removeItem("token");
+        localStorage.removeItem("user");
         setToken(null);
         setUser(null);
         router.push("/auth/login");
     }, [router]);
 
-    // Refresh user data from the backend (e.g. after profile update)
     const refreshUser = useCallback(async () => {
         try {
             const data = await getMe();
@@ -101,21 +107,12 @@ export function useAuth() {
     return ctx;
 }
 
-// ─── Role-based redirect helper ───────────────────────────────
 function redirectByRole(role, router) {
     switch (role) {
-        case "admin":
-            router.push("/dashboard/admin");
-            break;
-        case "employee":
-            router.push("/dashboard/employee");
-            break;
-        case "reviewer":
-            router.push("/dashboard/reviewer");
-            break;
-        case "approver":
-            router.push("/dashboard/approver");
-            break;
+        case "admin": router.push("/dashboard/admin"); break;
+        case "employee": router.push("/dashboard/employee"); break;
+        case "reviewer": router.push("/dashboard/reviewer"); break;
+        case "approver": router.push("/dashboard/approver"); break;
         default:
             console.warn("Unknown role:", role);
             router.push("/dashboard/employee");

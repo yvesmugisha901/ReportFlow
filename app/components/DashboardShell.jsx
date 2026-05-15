@@ -54,6 +54,17 @@ function getInitials(name) {
     return (name ?? "U").split(" ").map(w => w[0]).slice(0, 2).join("").toUpperCase();
 }
 
+/**
+ * Derive the role from the URL path as a fallback.
+ * /dashboard/approver/... → "approver"
+ * This prevents the employee-nav flash when the cached user object
+ * hasn't loaded yet but the URL already tells us the role.
+ */
+function roleFromPath(pathname) {
+    const seg = pathname?.split("/")?.[2];
+    return ["admin", "employee", "reviewer", "approver"].includes(seg) ? seg : null;
+}
+
 const Icon = ({ name, size = 16 }) => {
     const S = {
         width: size, height: size, viewBox: "0 0 24 24",
@@ -89,15 +100,27 @@ const Icon = ({ name, size = 16 }) => {
     }
 };
 
+// Maps event_type (DB column) → icon + colors
+// Also handles legacy `type` field just in case
 const TYPE_ICON_MAP = {
     submitted: { icon: "notif-submitted", color: "#6366f1", bg: "#eef2ff" },
     reviewed: { icon: "notif-reviewed", color: "#0ea5e9", bg: "#e0f2fe" },
     approved: { icon: "notif-approved", color: "#10b981", bg: "#d1fae5" },
     rejected: { icon: "notif-rejected", color: "#ef4444", bg: "#fee2e2" },
+    changes_requested: { icon: "notif-changes", color: "#f59e0b", bg: "#fef3c7" },
     changes: { icon: "notif-changes", color: "#f59e0b", bg: "#fef3c7" },
+    final_approved: { icon: "notif-approved", color: "#10b981", bg: "#d1fae5" },
+    under_review: { icon: "notif-reviewed", color: "#0ea5e9", bg: "#e0f2fe" },
+    report_due: { icon: "notif-scheduled", color: "#8b5cf6", bg: "#ede9fe" },
     scheduled: { icon: "notif-scheduled", color: "#8b5cf6", bg: "#ede9fe" },
     info: { icon: "notif-info", color: "#6b7280", bg: "#f3f4f6" },
 };
+
+function getTypeIcon(n) {
+    // DB returns event_type; fall back to type for safety
+    const key = n.event_type ?? n.type;
+    return TYPE_ICON_MAP[key] ?? TYPE_ICON_MAP.info;
+}
 
 export default function DashboardShell({ children }) {
     const { user, logout, refreshUser } = useAuth();
@@ -116,23 +139,28 @@ export default function DashboardShell({ children }) {
         markAllAsRead,
     } = useNotifications();
 
-    const role = user?.role ?? "employee";
+    // ── Role resolution ───────────────────────────────────────────────────────
+    // Use the URL path as the primary source so the correct nav renders
+    // immediately on load, even before getMe() resolves and updates user.role.
+    const pathRole = roleFromPath(pathname);
+    const role = pathRole ?? user?.role ?? "employee";
+    // ─────────────────────────────────────────────────────────────────────────
+
     const navItems = NAV[role] ?? NAV.employee;
     const roleColor = ROLE_COLORS[role] ?? "#6366f1";
     const initials = getInitials(user?.full_name);
     const bellHref = NOTIF_HREF[role] ?? "/dashboard/employee/notifications";
 
-    // Sync role on path change
+    // Sync user object when URL role doesn't match stored role
     useEffect(() => {
         if (!user) return;
-        const urlRole = pathname.split("/")[2];
-        if (urlRole && urlRole !== user.role) refreshUser();
-    }, [user, pathname, refreshUser]);
+        if (pathRole && pathRole !== user.role) refreshUser();
+    }, [user, pathRole, refreshUser]);
 
     // Close mobile sidebar on navigation
     useEffect(() => { setMobileOpen(false); }, [pathname]);
 
-    // Fetch pending counts
+    // Fetch pending counts for queue badge
     useEffect(() => {
         if (role === "admin") {
             const run = async () => {
@@ -306,9 +334,9 @@ export default function DashboardShell({ children }) {
                                 </div>
                             ) : preview.map((n) => {
                                 const isRead = n.is_read ?? false;
-                                const nid = n.notification_id ?? n.id;
-                                const typeKey = n.type in TYPE_ICON_MAP ? n.type : "info";
-                                const { icon: iconName, color: iconColor, bg: iconBg } = TYPE_ICON_MAP[typeKey];
+                                const nid = n.notification_id ?? n.notif_id ?? n.id;
+                                // ← Fixed: use event_type (DB column), not n.type
+                                const { icon: iconName, color: iconColor, bg: iconBg } = getTypeIcon(n);
                                 const time = n.created_at ? (() => {
                                     const diff = Date.now() - new Date(n.created_at).getTime();
                                     const mins = Math.floor(diff / 60000);
@@ -332,9 +360,9 @@ export default function DashboardShell({ children }) {
                                         </div>
                                         <div style={{ flex: 1, minWidth: 0 }}>
                                             <p style={{ fontSize: "12px", fontWeight: isRead ? 400 : 600, color: isRead ? "#6b7280" : "#111827", margin: "0 0 2px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                {n.title}
+                                                {n.title ?? n.message}
                                             </p>
-                                            {n.message && (
+                                            {n.title && n.message && (
                                                 <p style={{ fontSize: "11px", color: "#9ca3af", margin: "0 0 3px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                                     {n.message}
                                                 </p>
@@ -362,7 +390,7 @@ export default function DashboardShell({ children }) {
     return (
         <div className="rf-shell">
 
-            {/* Desktop sidebar — CSS hides this at ≤768px */}
+            {/* Desktop sidebar */}
             <aside className={`rf-sidebar rf-sidebar-base${collapsed ? " collapsed" : ""}`} aria-label="Sidebar">
                 <SidebarContent
                     onNavigate={undefined}
@@ -371,14 +399,14 @@ export default function DashboardShell({ children }) {
                 />
             </aside>
 
-            {/* Mobile overlay — CSS controls visibility via .visible class */}
+            {/* Mobile overlay */}
             <div
                 className={`rf-mobile-overlay${mobileOpen ? " visible" : ""}`}
                 onClick={() => setMobileOpen(false)}
                 aria-hidden="true"
             />
 
-            {/* Mobile sidebar — CSS shows this at ≤768px, slide controlled by .open */}
+            {/* Mobile sidebar */}
             <aside
                 className={`rf-mobile-sidebar${mobileOpen ? " open" : ""}`}
                 aria-label="Mobile navigation"
@@ -395,7 +423,6 @@ export default function DashboardShell({ children }) {
             <div className="rf-main">
                 <header className="rf-topbar">
                     <div className="rf-topbar-left">
-                        {/* Hamburger — CSS hides at ≥769px */}
                         <button
                             className="rf-hamburger"
                             onClick={() => setMobileOpen(true)}

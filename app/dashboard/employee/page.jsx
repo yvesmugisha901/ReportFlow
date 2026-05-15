@@ -67,7 +67,7 @@ function normalizeSchedule(s) {
 function buildPrefill(schedule) {
     if (!schedule) return null;
     return {
-        scheduleId: schedule.id,           // used by ReportForm to lock the schedule
+        scheduleId: schedule.id,
         reportType: schedule.reportType,
         department: schedule.department,
         frequency: schedule.frequency,
@@ -83,6 +83,9 @@ const STAT_CARDS = [
     { key: "changes", label: "Changes Requested", icon: "edit", bg: "bg-orange-50", iconColor: "text-orange-500", iconBg: "bg-orange-100", valueColor: "text-orange-700", border: "border-orange-100" },
     { key: "rejected", label: "Rejected", icon: "x", bg: "bg-rose-50", iconColor: "text-rose-500", iconBg: "bg-rose-100", valueColor: "text-rose-700", border: "border-rose-100" },
 ];
+
+// Statuses that mean the employee has already acted — don't count as overdue
+const ACTIONED_STATUSES = ["Approved", "Submitted", "Under Review"];
 
 export default function EmployeeDashboard() {
     const { user } = useAuth();
@@ -107,6 +110,8 @@ export default function EmployeeDashboard() {
             const normalized = rawReports.map(normalizeReport);
             setReports(normalized);
 
+            // A schedule counts as "submitted" if the employee has any non-Pending
+            // report against it — Submitted, Under Review, Approved, etc.
             const submittedScheduleIds = new Set(
                 normalized
                     .filter(r => r.status !== "Pending")
@@ -140,8 +145,19 @@ export default function EmployeeDashboard() {
         rejected: reports.filter(r => r.status === "Rejected").length,
     };
 
+    // nextDue: first upcoming schedule the employee hasn't submitted yet
     const nextDue = schedules.find(s => !s.submitted);
-    const overdueCount = reports.filter(r => r.is_late && r.status !== "Approved").length;
+
+    // overdueCount: only count reports that are late AND the employee hasn't
+    // submitted anything for them yet (Pending or Changes Requested only)
+    const overdueCount = reports.filter(
+        r => r.is_late && !ACTIONED_STATUSES.includes(r.status)
+    ).length;
+
+    // Banner should only show when there's something actionable:
+    // - overdue reports the employee still needs to submit, OR
+    // - an upcoming unsubmitted schedule deadline
+    const showBanner = overdueCount > 0 || !!nextDue;
 
     const activities = reports.slice(0, 8).map(r => {
         const typeMap = {
@@ -162,7 +178,7 @@ export default function EmployeeDashboard() {
         });
         setShowForm(false);
         setPrefill(null);
-        load();
+        load(); // re-fetch so banner recalculates immediately
     }
 
     /** Called from the Upcoming Deadlines list — always has full schedule info */
@@ -221,8 +237,8 @@ export default function EmployeeDashboard() {
                     </div>
                 ) : (
                     <>
-                        {/* Overdue / Upcoming Banner */}
-                        {(overdueCount > 0 || nextDue) && (
+                        {/* Overdue / Upcoming Banner — only shown when actionable */}
+                        {showBanner && (
                             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
                                     <Icon name="warning" className="w-4 h-4 text-amber-600" />
@@ -246,7 +262,6 @@ export default function EmployeeDashboard() {
                                         </>
                                     ) : null}
                                 </div>
-                                {/* ✅ Banner button now carries the schedule info into the form */}
                                 <button
                                     onClick={handleBannerSubmit}
                                     className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors flex-shrink-0"
@@ -317,4 +332,4 @@ export default function EmployeeDashboard() {
             )}
         </div>
     );
-}   
+}

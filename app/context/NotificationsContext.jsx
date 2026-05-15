@@ -13,18 +13,16 @@ import { useAuth } from "@/context/AuthContext";
 
 const NotificationsContext = createContext(null);
 
-// Roles that get notifications
 const NOTIF_ROLES = ["employee", "reviewer", "approver", "admin"];
 
 /**
  * Normalize a raw notification from the API.
- * The DB returns `notif_id`; we alias it to `notification_id` so every
- * consumer in the app can use a single, consistent field name.
+ * DB PK is `notif_id` — alias to `notification_id` so every consumer
+ * in the app uses one consistent field name.
  */
 function normalizeNotification(n) {
     return {
         ...n,
-        // Prefer notif_id (real DB column), fall back if already mapped
         notification_id: n.notif_id ?? n.notification_id,
     };
 }
@@ -36,7 +34,7 @@ export function NotificationsProvider({ children }) {
     const [loading, setLoading] = useState(false);
 
     const hasNotifications = NOTIF_ROLES.includes(user?.role);
-    const ready = !authLoading && hasNotifications;
+    const ready = !authLoading && !!user && hasNotifications;
 
     const fetchNotifications = useCallback(async () => {
         if (!ready) return;
@@ -48,7 +46,7 @@ export function NotificationsProvider({ children }) {
             setNotifications(list);
             setUnreadCount(list.filter((n) => !n.is_read).length);
         } catch {
-            // Silent — notifications are non-critical
+            // Non-critical — swallow silently
         } finally {
             setLoading(false);
         }
@@ -58,9 +56,11 @@ export function NotificationsProvider({ children }) {
         if (!ready) return;
         try {
             const data = await getUnreadCount();
-            setUnreadCount(data.count ?? 0);
+            // Backend returns { count } and { unread_count } — handle both
+            const n = data.count ?? data.unread_count ?? 0;
+            setUnreadCount(n);
         } catch {
-            // Silent
+            // Non-critical
         }
     }, [ready]);
 
@@ -72,10 +72,9 @@ export function NotificationsProvider({ children }) {
         return () => clearInterval(interval);
     }, [ready, fetchNotifications, fetchUnreadCount]);
 
-    // ── Actions ──────────────────────────────────────────────────────────
+    // ── Actions ──────────────────────────────────────────────
 
     const handleMarkAsRead = useCallback(async (notificationId) => {
-        // Optimistic update
         setNotifications((prev) =>
             prev.map((n) =>
                 n.notification_id === notificationId ? { ...n, is_read: true } : n
@@ -85,7 +84,7 @@ export function NotificationsProvider({ children }) {
         try {
             await markAsRead(notificationId);
         } catch {
-            // Revert on failure
+            // Revert
             setNotifications((prev) =>
                 prev.map((n) =>
                     n.notification_id === notificationId ? { ...n, is_read: false } : n
@@ -96,19 +95,16 @@ export function NotificationsProvider({ children }) {
     }, []);
 
     const handleMarkAllAsRead = useCallback(async () => {
-        // Optimistic update
         setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })));
         setUnreadCount(0);
         try {
             await markAllAsRead();
         } catch {
-            // Revert on failure
             fetchNotifications();
         }
     }, [fetchNotifications]);
 
     const handleDelete = useCallback(async (notificationId) => {
-        // Optimistic update
         setNotifications((prev) => {
             const removed = prev.find((n) => n.notification_id === notificationId);
             if (removed && !removed.is_read) {
@@ -119,18 +115,15 @@ export function NotificationsProvider({ children }) {
         try {
             await deleteNotification(notificationId);
         } catch {
-            // Revert on failure
             fetchNotifications();
         }
     }, [fetchNotifications]);
 
     const handleDeleteAllRead = useCallback(async () => {
-        // Optimistic update
         setNotifications((prev) => prev.filter((n) => !n.is_read));
         try {
             await deleteAllRead();
         } catch {
-            // Revert on failure
             fetchNotifications();
         }
     }, [fetchNotifications]);

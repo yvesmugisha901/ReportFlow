@@ -40,7 +40,7 @@ const statusColor = (deadline) => {
 };
 
 export default function SchedulesPage() {
-    const [viewMode, setViewMode] = useState("grid"); // 'grid' or 'table'
+    const [viewMode, setViewMode] = useState("grid");
     const [schedules, setSchedules] = useState([]);
     const [departments, setDepartments] = useState([]);
     const [teams, setTeams] = useState([]);
@@ -128,7 +128,6 @@ export default function SchedulesPage() {
                     </div>
 
                     <div className="flex items-center gap-3">
-                        {/* View Switcher */}
                         <div className="flex items-center bg-white border border-gray-200 rounded-xl p-1 shadow-sm">
                             <button
                                 onClick={() => setViewMode("grid")}
@@ -163,7 +162,6 @@ export default function SchedulesPage() {
                         <p className="font-medium">No schedules defined</p>
                     </div>
                 ) : viewMode === "grid" ? (
-                    /* ── GRID SYSTEM ────────────────────────────────── */
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {schedules.map(s => {
                             const st = statusColor(s.deadline);
@@ -181,7 +179,7 @@ export default function SchedulesPage() {
                                     <div className="space-y-2 mb-4">
                                         <div className="flex justify-between text-xs"><span className="text-gray-400">Frequency</span> <span className="font-medium">{capitalize(s.frequency)}</span></div>
                                         <div className="flex justify-between text-xs"><span className="text-gray-400">Department</span> <span className="font-medium">{s.department?.name ?? "Global"}</span></div>
-                                        <div className="flex justify-between text-xs"><span className="text-gray-400">Deadline</span> <span className="font-medium text-red-500">{s.deadline?.slice(0, 10) ?? "—"}</span></div>
+                                        <div className="flex justify-between text-xs"><span className="text-gray-400">Deadline</span> <span className="font-medium text-gray-700">{s.deadline?.slice(0, 10) ?? "—"}</span></div>
                                     </div>
                                     <div className="flex gap-2 border-t border-gray-50 pt-3">
                                         <button onClick={() => openEdit(s)} className="flex-1 text-xs py-1.5 rounded-lg border border-gray-100 text-gray-600 hover:bg-gray-50">Edit</button>
@@ -192,7 +190,6 @@ export default function SchedulesPage() {
                         })}
                     </div>
                 ) : (
-                    /* ── TABLE SYSTEM ───────────────────────────────── */
                     <div className="bg-white border border-gray-200 rounded-2xl overflow-hidden shadow-sm">
                         <div className="overflow-x-auto">
                             <table className="w-full text-left border-collapse">
@@ -247,7 +244,6 @@ export default function SchedulesPage() {
                 )}
             </div>
 
-            {/* Modals remain exactly as they were in your code... */}
             <Modal open={modalOpen} onClose={() => setModalOpen(false)}>
                 <h2 className="text-lg font-bold text-gray-900 mb-5">{editing ? "Edit Schedule" : "New Schedule"}</h2>
                 <div className="space-y-4">
