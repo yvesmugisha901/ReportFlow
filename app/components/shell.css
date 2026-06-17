@@ -228,7 +228,7 @@
     padding: 8px 10px;
     border-top: 1px solid var(--rf-border-light);
     flex-shrink: 0;
-    overflow: hidden;
+    overflow: visible;     /* ← was hidden, which clipped the button */
     white-space: nowrap;
     gap: 8px;
     min-height: 44px;
@@ -239,14 +239,18 @@
     color: var(--rf-text-muted);
     font-weight: 450;
     opacity: 1;
-    transition: opacity var(--rf-transition);
+    max-width: 200px;
+    transition: opacity var(--rf-transition), max-width var(--rf-transition);
     user-select: none;
     letter-spacing: 0.1px;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .rf-sidebar.collapsed .rf-collapse-label {
     opacity: 0;
     pointer-events: none;
+    max-width: 0;          /* ← collapses width so button stays in view */
 }
 
 .rf-collapse-btn {
