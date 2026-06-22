@@ -1,47 +1,205 @@
 "use client";
-import { useState } from "react";
-import Link from "next/link";
+import { useState, useEffect, useCallback } from "react";
+import ScheduleList from "@/components/dashboard/ScheduleList";
+import ActivityFeed from "@/components/dashboard/ActivityFeed";
+import ReportForm from "@/components/reports/ReportForm";
+import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/axios";
 
-const myReports = [
-    { name: "Monthly Operations Report", type: "Monthly", dueDate: "May 10, 2026", status: "Pending", submittedAt: null },
-    { name: "Q1 Team Performance", type: "Quarterly", dueDate: "May 5, 2026", status: "Approved", submittedAt: "Apr 30, 2026" },
-    { name: "Weekly Progress Update", type: "Weekly", dueDate: "May 3, 2026", status: "Under Review", submittedAt: "May 3, 2026" },
-    { name: "March Summary Report", type: "Monthly", dueDate: "Apr 5, 2026", status: "Changes Requested", submittedAt: "Apr 4, 2026" },
-    { name: "Safety Compliance Report", type: "Bi-weekly", dueDate: "Apr 20, 2026", status: "Approved", submittedAt: "Apr 19, 2026" },
-];
-
-const schedule = [
-    { type: "Weekly Progress Update", freq: "Every Monday", nextDue: "May 13, 2026", daysLeft: 7 },
-    { type: "Monthly Operations Report", freq: "1st of every month", nextDue: "Jun 1, 2026", daysLeft: 26 },
-    { type: "Q2 Performance Review", freq: "Quarterly", nextDue: "Jul 1, 2026", daysLeft: 56 },
-];
-
-const statusColor = {
-    Approved: "bg-emerald-100 text-emerald-700",
-    "Under Review": "bg-amber-100 text-amber-700",
-    Pending: "bg-gray-100 text-gray-600",
-    "Changes Requested": "bg-rose-100 text-rose-700",
-    Rejected: "bg-red-100 text-red-700",
+const STATUS_MAP = {
+    pending: "Pending",
+    submitted: "Submitted",
+    under_review: "Under Review",
+    changes_requested: "Changes Requested",
+    approved: "Approved",
+    rejected: "Rejected",
 };
 
-const timeline = [
-    { event: "Your report was approved by COO", time: "2 hours ago", icon: "✅", color: "bg-emerald-100" },
-    { event: "Changes requested on March Summary", time: "Yesterday", icon: "✏️", color: "bg-amber-100" },
-    { event: "Weekly Progress submitted successfully", time: "May 3", icon: "📤", color: "bg-sky-100" },
-    { event: "New report scheduled: Monthly Operations", time: "May 1", icon: "🗓️", color: "bg-indigo-100" },
+const Icon = ({ name, className = "w-5 h-5" }) => {
+    const p = { fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 1.75, strokeLinecap: "round", strokeLinejoin: "round" };
+    const icons = {
+        warning: <svg className={className} {...p}><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" /><line x1="12" y1="9" x2="12" y2="13" /><line x1="12" y1="17" x2="12.01" y2="17" /></svg>,
+        wave: <svg className={className} {...p}><path d="M18 11V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2" /><path d="M14 10V4a2 2 0 0 0-2-2 2 2 0 0 0-2 2v2" /><path d="M10 10.5V6a2 2 0 0 0-2-2 2 2 0 0 0-2 2v8" /><path d="M18 8a2 2 0 1 1 4 0v6a8 8 0 0 1-8 8h-2c-2.8 0-4.5-.86-5.99-2.34l-3.6-3.6a2 2 0 0 1 2.83-2.82L7 15" /></svg>,
+        plus: <svg className={className} {...p}><line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" /></svg>,
+        reports: <svg className={className} {...p}><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /></svg>,
+        check: <svg className={className} {...p}><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" /><polyline points="22 4 12 14.01 9 11.01" /></svg>,
+        clock: <svg className={className} {...p}><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>,
+        edit: <svg className={className} {...p}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" /><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" /></svg>,
+        x: <svg className={className} {...p}><circle cx="12" cy="12" r="10" /><line x1="15" y1="9" x2="9" y2="15" /><line x1="9" y1="9" x2="15" y2="15" /></svg>,
+        send: <svg className={className} {...p}><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></svg>,
+        eye: <svg className={className} {...p}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></svg>,
+    };
+    return icons[name] ?? null;
+};
+
+function normalizeReport(r) {
+    return {
+        id: r.report_id,
+        title: r.title,
+        employee: r.employee?.full_name ?? "Me",
+        department: r.employee?.department?.name ?? "—",
+        type: r.schedule?.title ?? "Report",
+        frequency: r.schedule?.frequency ?? "",
+        submittedAt: r.submitted_at
+            ? new Date(r.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            : null,
+        dueDate: r.schedule?.deadline
+            ? new Date(r.schedule.deadline).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            : null,
+        status: STATUS_MAP[r.status] ?? "Pending",
+        is_late: r.is_late ?? false,
+        schedule_id: r.schedule_id,
+    };
+}
+
+function normalizeSchedule(s) {
+    return {
+        id: s.schedule_id,
+        reportType: s.title ?? `Schedule #${s.schedule_id}`,
+        department: s.department?.name ?? "—",
+        dueDate: s.deadline,
+        frequency: s.frequency,
+        submitted: false,
+    };
+}
+
+/** Build the prefill object ReportForm expects from a schedule */
+function buildPrefill(schedule) {
+    if (!schedule) return null;
+    return {
+        scheduleId: schedule.id,
+        reportType: schedule.reportType,
+        department: schedule.department,
+        frequency: schedule.frequency,
+    };
+}
+
+const STAT_CARDS = [
+    { key: "total", label: "Total Reports", icon: "reports", bg: "bg-indigo-50", iconColor: "text-indigo-500", iconBg: "bg-indigo-100", valueColor: "text-indigo-700", border: "border-indigo-100" },
+    { key: "approved", label: "Approved", icon: "check", bg: "bg-emerald-50", iconColor: "text-emerald-500", iconBg: "bg-emerald-100", valueColor: "text-emerald-700", border: "border-emerald-100" },
+    { key: "submitted", label: "Submitted", icon: "send", bg: "bg-sky-50", iconColor: "text-sky-500", iconBg: "bg-sky-100", valueColor: "text-sky-700", border: "border-sky-100" },
+    { key: "under_review", label: "Under Review", icon: "eye", bg: "bg-violet-50", iconColor: "text-violet-500", iconBg: "bg-violet-100", valueColor: "text-violet-700", border: "border-violet-100" },
+    { key: "pending", label: "Pending", icon: "clock", bg: "bg-amber-50", iconColor: "text-amber-500", iconBg: "bg-amber-100", valueColor: "text-amber-700", border: "border-amber-100" },
+    { key: "changes", label: "Changes Requested", icon: "edit", bg: "bg-orange-50", iconColor: "text-orange-500", iconBg: "bg-orange-100", valueColor: "text-orange-700", border: "border-orange-100" },
+    { key: "rejected", label: "Rejected", icon: "x", bg: "bg-rose-50", iconColor: "text-rose-500", iconBg: "bg-rose-100", valueColor: "text-rose-700", border: "border-rose-100" },
 ];
 
+// Statuses that mean the employee has already acted — don't count as overdue
+const ACTIONED_STATUSES = ["Approved", "Submitted", "Under Review"];
+
 export default function EmployeeDashboard() {
-    const [filter, setFilter] = useState("All");
-    const statuses = ["All", "Pending", "Under Review", "Approved", "Changes Requested"];
-    const filtered = filter === "All" ? myReports : myReports.filter((r) => r.status === filter);
+    const { user } = useAuth();
+    const [reports, setReports] = useState([]);
+    const [schedules, setSchedules] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [showForm, setShowForm] = useState(false);
+    const [prefilledSchedule, setPrefill] = useState(null);
+
+    const load = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+            const [reportsRes, schedulesRes] = await Promise.all([
+                api.get("/reports"),
+                api.get("/schedules"),
+            ]);
+
+            const rawReports = reportsRes.data.reports ?? reportsRes.data ?? [];
+            const rawSchedules = schedulesRes.data.schedules ?? schedulesRes.data ?? [];
+            const normalized = rawReports.map(normalizeReport);
+            setReports(normalized);
+
+            // A schedule counts as "submitted" if the employee has any non-Pending
+            // report against it — Submitted, Under Review, Approved, etc.
+            const submittedScheduleIds = new Set(
+                normalized
+                    .filter(r => r.status !== "Pending")
+                    .map(r => r.schedule_id)
+                    .filter(Boolean)
+            );
+
+            setSchedules(
+                rawSchedules
+                    .map(s => ({ ...normalizeSchedule(s), submitted: submittedScheduleIds.has(s.schedule_id) }))
+                    .filter(s => s.dueDate && new Date(s.dueDate) >= new Date())
+                    .sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate))
+                    .slice(0, 5)
+            );
+        } catch {
+            setError("Failed to load dashboard data.");
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
 
     const counts = {
-        total: myReports.length,
-        approved: myReports.filter((r) => r.status === "Approved").length,
-        pending: myReports.filter((r) => r.status === "Pending").length,
-        changes: myReports.filter((r) => r.status === "Changes Requested").length,
+        total: reports.length,
+        approved: reports.filter(r => r.status === "Approved").length,
+        submitted: reports.filter(r => r.status === "Submitted").length,
+        under_review: reports.filter(r => r.status === "Under Review").length,
+        pending: reports.filter(r => r.status === "Pending").length,
+        changes: reports.filter(r => r.status === "Changes Requested").length,
+        rejected: reports.filter(r => r.status === "Rejected").length,
     };
+
+    // nextDue: first upcoming schedule the employee hasn't submitted yet
+    const nextDue = schedules.find(s => !s.submitted);
+
+    // overdueCount: only count reports that are late AND the employee hasn't
+    // submitted anything for them yet (Pending or Changes Requested only)
+    const overdueCount = reports.filter(
+        r => r.is_late && !ACTIONED_STATUSES.includes(r.status)
+    ).length;
+
+    // Banner should only show when there's something actionable:
+    // - overdue reports the employee still needs to submit, OR
+    // - an upcoming unsubmitted schedule deadline
+    const showBanner = overdueCount > 0 || !!nextDue;
+
+    const activities = reports.slice(0, 8).map(r => {
+        const typeMap = {
+            "Approved": { type: "approved", message: "Your report was approved" },
+            "Changes Requested": { type: "changes", message: "Changes requested on" },
+            "Pending": { type: "submitted", message: "Pending submission:" },
+            "Submitted": { type: "submitted", message: "Submitted for review:" },
+            "Under Review": { type: "submitted", message: "Under review:" },
+            "Rejected": { type: "changes", message: "Report rejected:" },
+        };
+        const meta = typeMap[r.status] ?? { type: "submitted", message: "Report:" };
+        return { id: r.id, type: meta.type, message: meta.message, reportTitle: r.title, time: r.submittedAt ?? "—" };
+    });
+
+    async function handleFormSubmit(formData) {
+        await api.post("/reports", formData, {
+            headers: { "Content-Type": "multipart/form-data" },
+        });
+        setShowForm(false);
+        setPrefill(null);
+        load(); // re-fetch so banner recalculates immediately
+    }
+
+    /** Called from the Upcoming Deadlines list — always has full schedule info */
+    function handleSubmitFromSchedule(schedule) {
+        setPrefill(buildPrefill(schedule));
+        setShowForm(true);
+    }
+
+    /** Called from the banner — prefills from nextDue if available */
+    function handleBannerSubmit() {
+        setPrefill(buildPrefill(nextDue ?? null));
+        setShowForm(true);
+    }
+
+    /** Plain "Submit Report" button in the header — no prefill */
+    function handleNewReport() {
+        setPrefill(null);
+        setShowForm(true);
+    }
+
+    const firstName = user?.full_name?.split(" ")[0] ?? "there";
 
     return (
         <div className="min-h-screen bg-[#f8f9fc] text-[#0f1117]">
@@ -55,146 +213,123 @@ export default function EmployeeDashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <p className="text-sm text-gray-500 mb-1">Welcome back 👋</p>
-                        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">My Reports</h1>
+                        <p className="text-sm text-gray-500 mb-1 flex items-center gap-1.5">
+                            <Icon name="wave" className="w-4 h-4 text-amber-400" />
+                            Welcome back, {firstName}
+                        </p>
+                        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">My Dashboard</h1>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <button className="relative p-2.5 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 transition-colors shadow-sm">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
-                        </button>
-                        <Link
-                            href="/dashboard/employee/reports/new"
-                            className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-indigo-200"
-                        >
-                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-                            </svg>
-                            Submit Report
-                        </Link>
-                    </div>
+                    <button
+                        onClick={handleNewReport}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-xl transition-all shadow-md shadow-indigo-200"
+                    >
+                        <Icon name="plus" className="w-4 h-4" />
+                        Submit Report
+                    </button>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                    {[
-                        { label: "Total Reports", value: counts.total, icon: "📋", color: "text-indigo-600" },
-                        { label: "Approved", value: counts.approved, icon: "✅", color: "text-emerald-600" },
-                        { label: "Pending", value: counts.pending, icon: "⏳", color: "text-amber-600" },
-                        { label: "Needs Changes", value: counts.changes, icon: "✏️", color: "text-rose-500" },
-                    ].map((s) => (
-                        <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                            <div className="text-xl mb-2">{s.icon}</div>
-                            <div className={`text-2xl font-extrabold mb-0.5 ${s.color}`}>{s.value}</div>
-                            <div className="text-[11px] text-gray-400 font-medium">{s.label}</div>
-                        </div>
-                    ))}
-                </div>
-
-                {/* Due Soon Banner */}
-                {counts.pending > 0 && (
-                    <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-center gap-3">
-                        <span className="text-xl">⚠️</span>
-                        <div className="flex-1">
-                            <p className="text-sm font-bold text-amber-800">You have {counts.pending} report{counts.pending > 1 ? "s" : ""} due</p>
-                            <p className="text-xs text-amber-600">Monthly Operations Report is due May 10, 2026 — 4 days left</p>
-                        </div>
-                        <Link
-                            href="/dashboard/employee/reports/new"
-                            className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors"
-                        >
-                            Submit Now
-                        </Link>
+                {loading ? (
+                    <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
+                ) : error ? (
+                    <div className="text-center py-16">
+                        <p className="text-red-500 mb-3">{error}</p>
+                        <button onClick={load} className="text-sm text-indigo-600 hover:underline">Retry</button>
                     </div>
-                )}
-
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                    {/* My Reports Table */}
-                    <div className="lg:col-span-2 bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                        <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                            <div className="flex items-center justify-between mb-3">
-                                <span className="font-bold text-sm text-gray-800">My Submissions</span>
+                ) : (
+                    <>
+                        {/* Overdue / Upcoming Banner — only shown when actionable */}
+                        {showBanner && (
+                            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 mb-6 flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-amber-100 flex items-center justify-center flex-shrink-0">
+                                    <Icon name="warning" className="w-4 h-4 text-amber-600" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    {overdueCount > 0 ? (
+                                        <>
+                                            <p className="text-sm font-bold text-amber-800">
+                                                {overdueCount} overdue report{overdueCount > 1 ? "s" : ""}
+                                            </p>
+                                            <p className="text-xs text-amber-600">Please submit as soon as possible.</p>
+                                        </>
+                                    ) : nextDue ? (
+                                        <>
+                                            <p className="text-sm font-bold text-amber-800">
+                                                Upcoming: {nextDue.reportType}
+                                            </p>
+                                            <p className="text-xs text-amber-600">
+                                                Due {new Date(nextDue.dueDate).toLocaleDateString()}
+                                            </p>
+                                        </>
+                                    ) : null}
+                                </div>
+                                <button
+                                    onClick={handleBannerSubmit}
+                                    className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-bold rounded-xl transition-colors flex-shrink-0"
+                                >
+                                    Submit Now
+                                </button>
                             </div>
-                            <div className="flex gap-1 flex-wrap">
-                                {statuses.map((s) => (
-                                    <button
-                                        key={s}
-                                        onClick={() => setFilter(s)}
-                                        className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${filter === s ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-900 hover:bg-gray-100"
-                                            }`}
-                                    >
-                                        {s}
-                                    </button>
-                                ))}
-                            </div>
-                        </div>
-                        <div>
-                            {filtered.map((r) => (
-                                <div key={r.name} className="flex items-center justify-between px-5 py-3.5 border-b border-gray-50 last:border-0 hover:bg-gray-50/50 transition-colors">
-                                    <div className="flex-1 min-w-0 mr-4">
-                                        <div className="text-sm font-semibold text-gray-800 truncate">{r.name}</div>
-                                        <div className="text-xs text-gray-400 mt-0.5">
-                                            {r.type} · Due {r.dueDate}
-                                            {r.submittedAt && ` · Submitted ${r.submittedAt}`}
+                        )}
+
+                        {/* Stats */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-4 gap-3 mb-6">
+                            {STAT_CARDS.map((card) => (
+                                <div
+                                    key={card.key}
+                                    className={`${card.bg} border ${card.border} rounded-2xl p-4 flex flex-col gap-3`}
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide leading-tight">
+                                            {card.label}
+                                        </span>
+                                        <div className={`w-8 h-8 rounded-lg ${card.iconBg} flex items-center justify-center flex-shrink-0`}>
+                                            <Icon name={card.icon} className={`w-4 h-4 ${card.iconColor}`} />
                                         </div>
                                     </div>
-                                    <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold whitespace-nowrap ${statusColor[r.status]}`}>
-                                        {r.status}
-                                    </span>
+                                    <p className={`text-3xl font-extrabold ${card.valueColor} leading-none`}>
+                                        {counts[card.key]}
+                                    </p>
                                 </div>
                             ))}
-                        </div>
-                    </div>
 
-                    {/* Right Column */}
-                    <div className="flex flex-col gap-6">
-
-                        {/* Upcoming Schedule */}
-                        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                                <span className="font-bold text-sm text-gray-800">Upcoming Schedule</span>
-                            </div>
-                            <div className="p-5 space-y-3">
-                                {schedule.map((s) => (
-                                    <div key={s.type} className="flex items-start gap-3">
-                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-sm font-bold flex-shrink-0 ${s.daysLeft <= 7 ? "bg-rose-50 text-rose-600 border border-rose-200" : "bg-indigo-50 text-indigo-600 border border-indigo-200"
-                                            }`}>
-                                            {s.daysLeft}d
-                                        </div>
-                                        <div>
-                                            <p className="text-xs font-semibold text-gray-800">{s.type}</p>
-                                            <p className="text-[10px] text-gray-400">{s.freq} · Due {s.nextDue}</p>
-                                        </div>
-                                    </div>
-                                ))}
+                            <div
+                                className="bg-indigo-600 rounded-2xl p-4 flex flex-col justify-between cursor-pointer hover:bg-indigo-700 transition-colors"
+                                onClick={handleNewReport}
+                            >
+                                <div className="w-8 h-8 rounded-lg bg-white/20 flex items-center justify-center">
+                                    <Icon name="plus" className="w-4 h-4 text-white" />
+                                </div>
+                                <div>
+                                    <p className="text-white font-bold text-sm leading-tight">New Report</p>
+                                    <p className="text-indigo-200 text-xs mt-0.5">Submit now</p>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Recent Activity */}
-                        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                                <span className="font-bold text-sm text-gray-800">Recent Activity</span>
+                        {/* Bottom Grid */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2">
+                                <ActivityFeed activities={activities} title="Recent Activity" maxItems={8} />
                             </div>
-                            <div className="p-5 space-y-3">
-                                {timeline.map((t, i) => (
-                                    <div key={i} className="flex items-start gap-3">
-                                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center text-sm flex-shrink-0 ${t.color}`}>
-                                            {t.icon}
-                                        </div>
-                                        <div>
-                                            <p className="text-xs text-gray-700 font-medium">{t.event}</p>
-                                            <p className="text-[10px] text-gray-400 mt-0.5">{t.time}</p>
-                                        </div>
-                                    </div>
-                                ))}
+                            <div>
+                                <ScheduleList
+                                    schedules={schedules}
+                                    onSubmit={handleSubmitFromSchedule}
+                                    title="Upcoming Deadlines"
+                                />
                             </div>
                         </div>
-                    </div>
-                </div>
+                    </>
+                )}
             </div>
+
+            {showForm && (
+                <ReportForm
+                    prefill={prefilledSchedule}
+                    onClose={() => { setShowForm(false); setPrefill(null); }}
+                    onSubmit={handleFormSubmit}
+                />
+            )}
         </div>
     );
 }

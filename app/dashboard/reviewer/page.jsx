@@ -1,40 +1,172 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import StatsGrid from "@/components/dashboard/StatsGrid";
+import ReviewQueue from "@/components/dashboard/ReviewQueue";
+import ComplianceBar from "@/components/dashboard/ComplianceBar";
+import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/axios";
 
-const pendingReports = [
-    { id: 1, name: "Monthly Finance Report", employee: "Alice Uwimana", dept: "Finance", submitted: "May 5, 2026", type: "Monthly", priority: "high" },
-    { id: 2, name: "Weekly Ops Update", employee: "Jean Mugisha", dept: "Finance", submitted: "May 4, 2026", type: "Weekly", priority: "normal" },
-    { id: 3, name: "Budget Variance Report", employee: "Diane Mukamana", dept: "Finance", submitted: "May 3, 2026", type: "Bi-weekly", priority: "high" },
-    { id: 4, name: "Staff Training Summary", employee: "Grace Iradukunda", dept: "Finance", submitted: "May 2, 2026", type: "Monthly", priority: "normal" },
-];
+const STATUS_MAP = {
+    pending: "Pending",
+    submitted: "Submitted",
+    under_review: "Under Review",
+    changes_requested: "Changes Requested",
+    approved: "Approved",
+    rejected: "Rejected",
+};
 
-const reviewed = [
-    { name: "Q1 Finance Overview", employee: "Alice Uwimana", action: "Approved", date: "May 1, 2026" },
-    { name: "April Expense Report", employee: "Jean Mugisha", action: "Changes Requested", date: "Apr 29, 2026" },
-    { name: "Compliance Checklist", employee: "Diane Mukamana", action: "Approved", date: "Apr 28, 2026" },
-];
+function normalizeReport(r) {
+    return {
+        id: r.report_id,
+        title: r.title,
+        employee: r.employee?.full_name ?? "—",
+        department: r.employee?.department?.name ?? "—",
+        type: r.schedule?.title ?? r.schedule?.frequency ?? "Report",
+        submittedAt: r.submitted_at
+            ? new Date(r.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            : "—",
+        fileUrl: r.file_path ?? null,
+    };
+}
 
-const deptProgress = {
-    name: "Finance Department",
-    submitted: 11,
-    total: 14,
-    approved: 8,
-    underReview: 3,
-    pending: 3,
+const ACTION_BADGE = {
+    approved: "bg-emerald-100 text-emerald-700",
+    changes_requested: "bg-amber-100 text-amber-700",
+    rejected: "bg-rose-100 text-rose-700",
+};
+
+const ACTION_LABEL = {
+    approved: "Approved",
+    changes_requested: "Changes Requested",
+    rejected: "Rejected",
 };
 
 export default function ReviewerDashboard() {
-    const [selected, setSelected] = useState(null);
-    const [comment, setComment] = useState("");
-    const [actionDone, setActionDone] = useState({});
+    const { user } = useAuth();
+    const [pendingReports, setPending] = useState([]);
+    const [recentLogs, setRecentLogs] = useState([]);
+    const [deptCompliance, setDeptCompliance] = useState([]);  // ✅ real data
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [actioning, setActioning] = useState(null);
 
-    const handleAction = (id, action) => {
-        setActionDone((prev) => ({ ...prev, [id]: action }));
-        setSelected(null);
-        setComment("");
-    };
+    // ✅ Resolve dept info from the enriched user object (set by AuthContext via getMe)
+    const deptId = user?.department?.dept_id ?? user?.dept_id ?? null;
+    const deptName = user?.department?.name ?? user?.department_name ?? user?.dept_name ?? null;
 
-    const pct = Math.round((deptProgress.submitted / deptProgress.total) * 100);
+    const load = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const [pendingRes, allRes] = await Promise.all([
+                api.get("/reviews/pending"),
+                api.get("/reports"),
+            ]);
+
+            const pending = (pendingRes.data.reports ?? []).map(normalizeReport);
+            const reviewed = (allRes.data.reports ?? [])
+                .filter(r => ['under_review', 'approved', 'rejected', 'changes_requested'].includes(r.status))
+                .slice(0, 5)
+                .map(r => ({
+                    name: r.title,
+                    employee: r.employee?.full_name ?? "—",
+                    action: r.status,
+                    date: r.submitted_at
+                        ? new Date(r.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+                        : "—",
+                }));
+
+            setPending(pending);
+            setRecentLogs(reviewed);
+
+            // ✅ Fetch real department compliance from dedicated endpoint
+            if (deptId) {
+                try {
+                    const compRes = await api.get(`/departments/${deptId}/compliance`);
+                    setDeptCompliance([{
+                        name: compRes.data.name ?? deptName ?? "Department",
+                        submitted: compRes.data.submitted ?? 0,
+                        total: compRes.data.total || 1,
+                        color: "violet",
+                    }]);
+                } catch {
+                    // Fallback: derive from loaded reports if compliance endpoint fails
+                    const total = pending.length + reviewed.length;
+                    setDeptCompliance([{
+                        name: deptName ?? "Department",
+                        submitted: reviewed.length,
+                        total: total || 1,
+                        color: "violet",
+                    }]);
+                }
+            } else {
+                // No dept_id yet (user object still loading from getMe) — use derived counts
+                const total = pending.length + reviewed.length;
+                setDeptCompliance([{
+                    name: deptName ?? "Department",
+                    submitted: reviewed.length,
+                    total: total || 1,
+                    color: "violet",
+                }]);
+            }
+        } catch {
+            setError("Failed to load review queue.");
+        } finally {
+            setLoading(false);
+        }
+    }, [deptId, deptName]);
+
+    useEffect(() => { load(); }, [load]);
+
+    async function handleAction(id, action, comment) {
+        setActioning(id);
+        try {
+            await api.post(`/reviews/${id}`, { action, comment });
+            setPending(prev => prev.filter(r => r.id !== id));
+            load();
+        } catch (err) {
+            const msg = err?.response?.data?.error ?? "Action failed. Please try again.";
+            alert(msg);
+        } finally {
+            setActioning(null);
+        }
+    }
+
+    // ─── Drop this into ReviewerDashboard.jsx, replacing your existing stats block ───
+
+    const approvedCount = recentLogs.filter(r => r.action === "approved").length;
+    const rejectedCount = recentLogs.filter(r => r.action === "rejected").length;
+    const changesCount = recentLogs.filter(r => r.action === "changes_requested").length;
+    const underReview = recentLogs.filter(r => r.action === "under_review").length;
+    const totalSubmitted = pendingReports.length + recentLogs.length;
+
+    const totalOutcomes = approvedCount + rejectedCount;
+    const approvalRate = totalOutcomes > 0 ? Math.round((approvedCount / totalOutcomes) * 100) : 0;
+
+    const deptSubmitted = deptCompliance[0]?.submitted ?? 0;
+    const deptTotal = deptCompliance[0]?.total ?? 1;
+    // ✅ Math.min(100) prevents values like 300% when submitted > total
+    const deptPct = deptTotal > 0 ? Math.min(100, Math.round((deptSubmitted / deptTotal) * 100)) : 0;
+
+    const stats = [
+        { label: "Awaiting Review", value: pendingReports.length, icon: "hourglass", color: "amber" },
+        { label: "Under Review", value: underReview, icon: "eye", color: "sky" },
+        { label: "Changes Requested", value: changesCount, icon: "pencil", color: "violet" },
+        { label: "Total Submitted", value: totalSubmitted, icon: "inbox", color: "indigo" },
+        { label: "Approved", value: approvedCount, icon: "check", color: "emerald" },
+        { label: "Rejected", value: rejectedCount, icon: "rejected", color: "rose" },
+        { label: "Approval Rate", value: `${approvalRate}%`, icon: "chart", color: "teal" },
+        { label: "Dept. Compliance", value: `${deptPct}%`, icon: "compliance", color: "violet" },
+    ];
+
+    // ─── Then update the StatsGrid call to cols={8} ───
+    // <StatsGrid stats={stats} cols={8} />
+
+    const firstName = user?.full_name?.split(" ")[0] ?? "Reviewer";
+
+    // ✅ Title shows the actual department name
+    const complianceTitle = deptName ? `${deptName} Progress` : "Department Progress";
 
     return (
         <div className="min-h-screen bg-[#f8f9fc] text-[#0f1117]">
@@ -48,164 +180,75 @@ export default function ReviewerDashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <p className="text-sm text-gray-500 mb-1">Stage 1 Review 🔍</p>
-                        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">Reviewer Dashboard</h1>
+                        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
+                            Hey {firstName}, here&apos;s your queue
+                        </h1>
+                        {/* ✅ Show dept name as subtitle */}
+                        {deptName && (
+                            <p className="text-sm text-gray-400 mt-0.5">{deptName}</p>
+                        )}
                     </div>
-                    <button className="relative p-2.5 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 transition-colors shadow-sm">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                        </svg>
-                        <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
-                    </button>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                    {[
-                        { label: "Awaiting Review", value: pendingReports.filter(r => !actionDone[r.id]).length, icon: "⏳", color: "text-amber-600" },
-                        { label: "Reviewed Today", value: Object.keys(actionDone).length, icon: "✅", color: "text-emerald-600" },
-                        { label: "Dept. Submitted", value: deptProgress.submitted, icon: "📤", color: "text-indigo-600" },
-                        { label: "Dept. Approved", value: deptProgress.approved, icon: "📊", color: "text-violet-600" },
-                    ].map((s) => (
-                        <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                            <div className="text-xl mb-2">{s.icon}</div>
-                            <div className={`text-2xl font-extrabold mb-0.5 ${s.color}`}>{s.value}</div>
-                            <div className="text-[11px] text-gray-400 font-medium">{s.label}</div>
+                {loading ? (
+                    <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
+                ) : error ? (
+                    <div className="text-center py-16">
+                        <p className="text-red-500 mb-3">{error}</p>
+                        <button onClick={load} className="text-sm text-indigo-600 hover:underline">Retry</button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="mb-6">
+                            <StatsGrid stats={stats} cols={4} />
                         </div>
-                    ))}
-                </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
-                    {/* Pending Review Queue */}
-                    <div className="lg:col-span-2 space-y-4">
-                        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-                                <span className="font-bold text-sm text-gray-800">Pending Review Queue</span>
-                                <span className="text-xs bg-amber-100 text-amber-700 font-bold px-2.5 py-1 rounded-full">
-                                    {pendingReports.filter(r => !actionDone[r.id]).length} pending
-                                </span>
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            {/* Review queue */}
+                            <div className="lg:col-span-2">
+                                <ReviewQueue
+                                    items={pendingReports}
+                                    onAction={handleAction}
+                                    stage={1}
+                                    title="Pending Review Queue"
+                                />
                             </div>
-                            <div>
-                                {pendingReports.map((r) => (
-                                    <div key={r.id} className={`border-b border-gray-50 last:border-0 transition-all ${actionDone[r.id] ? "opacity-50" : ""}`}>
-                                        <div className="flex items-center justify-between px-5 py-4 hover:bg-gray-50/50">
-                                            <div className="flex items-center gap-3 flex-1 min-w-0">
-                                                {r.priority === "high" && (
-                                                    <span className="w-2 h-2 bg-rose-500 rounded-full flex-shrink-0" />
-                                                )}
-                                                <div className="min-w-0">
-                                                    <div className="text-sm font-semibold text-gray-800 truncate">{r.name}</div>
-                                                    <div className="text-xs text-gray-400 mt-0.5">
-                                                        {r.employee} · {r.type} · Submitted {r.submitted}
+
+                            {/* Right column */}
+                            <div className="flex flex-col gap-6">
+                                {/* ✅ Real department name + real compliance data */}
+                                <ComplianceBar
+                                    departments={deptCompliance}
+                                    title={complianceTitle}
+                                />
+
+                                {/* Recently reviewed */}
+                                <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+                                    <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
+                                        <span className="font-bold text-sm text-gray-800">Recently Reviewed</span>
+                                    </div>
+                                    {recentLogs.length === 0 ? (
+                                        <p className="text-xs text-gray-400 text-center py-8">No reviews yet this period.</p>
+                                    ) : (
+                                        <div className="divide-y divide-gray-50">
+                                            {recentLogs.map((r, i) => (
+                                                <div key={i} className="px-5 py-3 flex items-center justify-between">
+                                                    <div>
+                                                        <p className="text-xs font-semibold text-gray-800 truncate max-w-[160px]">{r.name}</p>
+                                                        <p className="text-[10px] text-gray-400">{r.employee} · {r.date}</p>
                                                     </div>
+                                                    <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${ACTION_BADGE[r.action] ?? "bg-gray-100 text-gray-600"}`}>
+                                                        {ACTION_LABEL[r.action] ?? r.action}
+                                                    </span>
                                                 </div>
-                                            </div>
-                                            {actionDone[r.id] ? (
-                                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold ${actionDone[r.id] === "Approved" ? "bg-emerald-100 text-emerald-700" :
-                                                    actionDone[r.id] === "Rejected" ? "bg-red-100 text-red-700" :
-                                                        "bg-amber-100 text-amber-700"
-                                                    }`}>{actionDone[r.id]}</span>
-                                            ) : (
-                                                <button
-                                                    onClick={() => setSelected(selected === r.id ? null : r.id)}
-                                                    className="px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg border border-indigo-200 transition-colors flex-shrink-0"
-                                                >
-                                                    Review
-                                                </button>
-                                            )}
+                                            ))}
                                         </div>
-
-                                        {/* Inline Review Panel */}
-                                        {selected === r.id && (
-                                            <div className="px-5 pb-4 bg-indigo-50/40 border-t border-indigo-100">
-                                                <p className="text-xs font-semibold text-gray-700 mb-2 pt-3">Add comment (optional)</p>
-                                                <textarea
-                                                    className="w-full border border-gray-200 rounded-xl p-3 text-xs text-gray-700 resize-none focus:outline-none focus:border-indigo-400 bg-white"
-                                                    rows={2}
-                                                    placeholder="Leave a note for the employee..."
-                                                    value={comment}
-                                                    onChange={(e) => setComment(e.target.value)}
-                                                />
-                                                <div className="flex gap-2 mt-3">
-                                                    <button
-                                                        onClick={() => handleAction(r.id, "Approved")}
-                                                        className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors"
-                                                    >
-                                                        ✓ Approve
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAction(r.id, "Changes Requested")}
-                                                        className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-colors"
-                                                    >
-                                                        ✏ Request Changes
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAction(r.id, "Rejected")}
-                                                        className="flex-1 py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition-colors"
-                                                    >
-                                                        ✕ Reject
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Right Column */}
-                    <div className="flex flex-col gap-6">
-
-                        {/* Department Progress */}
-                        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                                <span className="font-bold text-sm text-gray-800">{deptProgress.name}</span>
-                            </div>
-                            <div className="p-5">
-                                <div className="flex justify-between text-xs text-gray-500 mb-2">
-                                    <span>Submission Progress</span>
-                                    <span className="font-bold text-gray-800">{pct}%</span>
-                                </div>
-                                <div className="w-full bg-gray-100 rounded-full h-3 mb-4">
-                                    <div className="bg-violet-500 h-3 rounded-full transition-all" style={{ width: `${pct}%` }} />
-                                </div>
-                                <div className="grid grid-cols-3 gap-2 text-center">
-                                    {[
-                                        { label: "Submitted", val: deptProgress.submitted, color: "text-indigo-600" },
-                                        { label: "Approved", val: deptProgress.approved, color: "text-emerald-600" },
-                                        { label: "Pending", val: deptProgress.pending, color: "text-amber-600" },
-                                    ].map((item) => (
-                                        <div key={item.label} className="bg-gray-50 rounded-xl p-2">
-                                            <div className={`text-lg font-extrabold ${item.color}`}>{item.val}</div>
-                                            <div className="text-[9px] text-gray-400 font-medium">{item.label}</div>
-                                        </div>
-                                    ))}
+                                    )}
                                 </div>
                             </div>
                         </div>
-
-                        {/* Recently Reviewed */}
-                        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                                <span className="font-bold text-sm text-gray-800">Recently Reviewed</span>
-                            </div>
-                            <div className="divide-y divide-gray-50">
-                                {reviewed.map((r) => (
-                                    <div key={r.name} className="px-5 py-3 flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs font-semibold text-gray-800">{r.name}</p>
-                                            <p className="text-[10px] text-gray-400">{r.employee} · {r.date}</p>
-                                        </div>
-                                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold ${r.action === "Approved" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"
-                                            }`}>{r.action}</span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    </>
+                )}
             </div>
         </div>
     );

@@ -1,51 +1,317 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect, useCallback } from "react";
+import StatsGrid from "@/components/dashboard/StatsGrid";
+import ReviewQueue from "@/components/dashboard/ReviewQueue";
+import ComplianceBar from "@/components/dashboard/ComplianceBar";
+import ReportTable from "@/components/dashboard/ReportTable";
+import { useAuth } from "@/context/AuthContext";
+import api from "@/lib/axios";
 
-const pendingApprovals = [
-    { id: 1, name: "Monthly Finance Report", employee: "Alice Uwimana", dept: "Finance", reviewer: "Eric Nshimiyimana", passedStage1: "May 5, 2026", type: "Monthly" },
-    { id: 2, name: "Budget Variance Report", employee: "Diane Mukamana", dept: "Finance", reviewer: "Eric Nshimiyimana", passedStage1: "May 4, 2026", type: "Bi-weekly" },
-    { id: 3, name: "Q2 Operations Summary", employee: "Jean Mugisha", dept: "Operations", reviewer: "Solange Uwase", passedStage1: "May 3, 2026", type: "Quarterly" },
-    { id: 4, name: "HR Staff Report", employee: "Grace Iradukunda", dept: "Human Resources", reviewer: "Patrick Habimana", passedStage1: "May 2, 2026", type: "Monthly" },
-];
-
-const allReports = [
-    { name: "Monthly Finance Report", dept: "Finance", status: "Pending Final", date: "May 5" },
-    { name: "Q1 Company Overview", dept: "All Depts", status: "Approved", date: "Apr 30" },
-    { name: "IT Infrastructure Q1", dept: "IT", status: "Approved", date: "Apr 28" },
-    { name: "HR Compliance Report", dept: "HR", status: "Rejected", date: "Apr 25" },
-    { name: "Sales Pipeline Apr", dept: "Sales", status: "Approved", date: "Apr 22" },
-];
-
-const complianceByDept = [
-    { name: "Finance", rate: 90, color: "bg-indigo-500" },
-    { name: "Operations", rate: 75, color: "bg-violet-500" },
-    { name: "Human Resources", rate: 67, color: "bg-sky-500" },
-    { name: "IT", rate: 88, color: "bg-emerald-500" },
-    { name: "Sales", rate: 50, color: "bg-amber-500" },
-    { name: "Legal", rate: 75, color: "bg-rose-500" },
-];
-
-const statusColor = {
-    "Pending Final": "bg-amber-100 text-amber-700",
-    Approved: "bg-emerald-100 text-emerald-700",
-    Rejected: "bg-red-100 text-red-700",
+const STATUS_LABEL = {
+    pending: "Pending",
+    submitted: "Submitted",
+    under_review: "Under Review",
+    changes_requested: "Changes Requested",
+    approved: "Approved",
+    rejected: "Rejected",
 };
 
-export default function ApproverDashboard() {
-    const [selected, setSelected] = useState(null);
-    const [comment, setComment] = useState("");
-    const [actionDone, setActionDone] = useState({});
+const FILE_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || "http://localhost:5000/api").replace(/\/api$/, "");
 
-    const handleAction = (id, action) => {
-        setActionDone((prev) => ({ ...prev, [id]: action }));
-        setSelected(null);
-        setComment("");
-    };
-
-    const remaining = pendingApprovals.filter((r) => !actionDone[r.id]).length;
-    const overallCompliance = Math.round(
-        complianceByDept.reduce((sum, d) => sum + d.rate, 0) / complianceByDept.length
+function normalizePending(r) {
+    const stage1Log = (r.reviewLogs ?? []).find(
+        (l) => l.stage === "stage_1" && l.action === "approved"
     );
+    return {
+        id: r.report_id,
+        title: r.title,
+        employee: r.employee?.full_name ?? "—",
+        department: r.employee?.department?.name ?? "—",
+        type: r.schedule?.title ?? r.schedule?.frequency ?? "Report",
+        submittedAt: r.submitted_at
+            ? new Date(r.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })
+            : "—",
+        stage1Reviewer: stage1Log?.reviewer?.full_name ?? null,
+        fileUrl: r.file_path ?? null,
+    };
+}
+
+function normalizeTableReport(r) {
+    return {
+        id: r.report_id,
+        title: r.title,
+        employee: r.employee?.full_name ?? "—",
+        department: r.employee?.department?.name ?? "—",
+        type: r.schedule?.frequency ?? "—",
+        submittedAt: r.submitted_at
+            ? new Date(r.submitted_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })
+            : "—",
+        status: STATUS_LABEL[r.status] ?? r.status,
+    };
+}
+
+// ── Inline ReportModal ────────────────────────────────────────
+function ReportModal({ reportId, title, onClose }) {
+    const [report, setReport] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const fetchReport = async () => {
+            try {
+                const res = await api.get(`/reports/${reportId}`);
+                setReport(res.data.report ?? res.data);
+            } catch {
+                setError("Could not load report content.");
+            } finally {
+                setLoading(false);
+            }
+        };
+        fetchReport();
+    }, [reportId]);
+
+    return (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+            <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-200 w-full max-w-2xl max-h-[85vh] flex flex-col">
+
+                {/* Header */}
+                <div className="flex items-start justify-between px-6 py-4 border-b border-gray-100 flex-shrink-0">
+                    <div className="flex-1 min-w-0 pr-4">
+                        <p className="text-[11px] font-semibold text-indigo-600 uppercase tracking-widest mb-0.5">
+                            Report Preview
+                        </p>
+                        <h3 className="text-base font-bold text-gray-900 truncate">{title}</h3>
+                    </div>
+                    <button
+                        onClick={onClose}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-700 transition-colors flex-shrink-0"
+                    >
+                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
+
+                {/* Body */}
+                <div className="flex-1 overflow-y-auto px-6 py-5">
+                    {loading ? (
+                        <div className="flex items-center justify-center h-40 text-gray-400 text-sm">Loading report…</div>
+                    ) : error ? (
+                        <div className="text-center py-10"><p className="text-red-500 text-sm">{error}</p></div>
+                    ) : (
+                        <div className="space-y-5">
+                            {/* Meta info */}
+                            <div className="grid grid-cols-2 gap-3">
+                                {[
+                                    { label: "Employee", value: report?.employee?.full_name ?? "—" },
+                                    { label: "Department", value: report?.employee?.department?.name ?? "—" },
+                                    { label: "Team", value: report?.employee?.team?.name ?? "—" },
+                                    { label: "Schedule", value: report?.schedule?.title ?? "—" },
+                                    {
+                                        label: "Submitted", value: report?.submitted_at
+                                            ? new Date(report.submitted_at).toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric", hour: "2-digit", minute: "2-digit" })
+                                            : "Not submitted"
+                                    },
+                                    {
+                                        label: "Status", value: report?.status
+                                            ? report.status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())
+                                            : "—"
+                                    },
+                                ].map(({ label, value }) => (
+                                    <div key={label} className="bg-gray-50 rounded-xl px-4 py-3">
+                                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-widest mb-0.5">{label}</p>
+                                        <p className="text-sm font-semibold text-gray-800">{value}</p>
+                                    </div>
+                                ))}
+                            </div>
+
+                            {/* Report content */}
+                            {report?.content && (
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Report Content</p>
+                                    <div className="bg-gray-50 border border-gray-200 rounded-xl px-5 py-4 text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">
+                                        {report.content}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Attached file */}
+                            <div>
+                                <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Attached File</p>
+                                {report?.file_path ? (
+                                    <a
+                                        href={`${FILE_BASE_URL}${report.file_path}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        download={report.file_name ?? true}
+                                        className="inline-flex items-center gap-2 px-4 py-2.5 bg-indigo-50 border border-indigo-200 rounded-xl text-sm font-semibold text-indigo-600 hover:bg-indigo-100 transition-colors"
+                                    >
+                                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                        </svg>
+                                        {report.file_name ?? "Download file"}
+                                    </a>
+                                ) : (
+                                    <div className="flex items-center gap-2 px-4 py-3 bg-gray-50 border border-dashed border-gray-200 rounded-xl">
+                                        <svg className="w-4 h-4 text-gray-300 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                                        </svg>
+                                        <span className="text-sm text-gray-400">No file attached — this is a text report.</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* No content or file */}
+                            {!report?.content && !report?.file_path && (
+                                <div className="text-center py-8 text-gray-400">
+                                    <p className="text-sm">No content or file attached to this report.</p>
+                                </div>
+                            )}
+
+                            {/* Review logs */}
+                            {(report?.reviewLogs ?? []).length > 0 && (
+                                <div>
+                                    <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Review History</p>
+                                    <div className="space-y-2">
+                                        {report.reviewLogs.map((log) => (
+                                            <div
+                                                key={log.log_id}
+                                                className={`px-4 py-3 rounded-xl border text-xs ${log.action === "approved"
+                                                    ? "bg-emerald-50 border-emerald-200"
+                                                    : log.action === "rejected"
+                                                        ? "bg-rose-50 border-rose-200"
+                                                        : "bg-amber-50 border-amber-200"
+                                                    }`}
+                                            >
+                                                <div className="flex items-center justify-between mb-1">
+                                                    <span className="font-semibold text-gray-700">
+                                                        {log.reviewer?.full_name ?? "Reviewer"} — Stage {log.stage === "stage_1" ? "1" : "2"}
+                                                    </span>
+                                                    <span className={`font-bold capitalize ${log.action === "approved" ? "text-emerald-600" :
+                                                        log.action === "rejected" ? "text-rose-600" : "text-amber-600"
+                                                        }`}>
+                                                        {log.action.replace("_", " ")}
+                                                    </span>
+                                                </div>
+                                                {log.comment && <p className="text-gray-500 leading-relaxed">{log.comment}</p>}
+                                                <p className="text-gray-400 mt-1">
+                                                    {new Date(log.created_at).toLocaleDateString("en-US", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}
+                                                </p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </div>
+
+                {/* Footer */}
+                <div className="px-6 py-4 border-t border-gray-100 flex-shrink-0">
+                    <button
+                        onClick={onClose}
+                        className="w-full py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-semibold rounded-xl transition-colors"
+                    >
+                        Close
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ── Main Dashboard ────────────────────────────────────────────
+export default function ApproverDashboard() {
+    const { user } = useAuth();
+
+    const [pendingReports, setPending] = useState([]);
+    const [allReports, setAll] = useState([]);
+    const [dashStats, setDashStats] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
+    const [viewing, setViewing] = useState(null);
+
+    const load = useCallback(async () => {
+        try {
+            setLoading(true);
+            setError(null);
+
+            const [pendingRes, allRes, statsRes] = await Promise.all([
+                api.get("/reviews/pending"),
+                api.get("/reports"),
+                api.get("/dashboard/approver"),
+            ]);
+
+            setPending((pendingRes.data.reports ?? []).map(normalizePending));
+            setAll((allRes.data.reports ?? []).map(normalizeTableReport));
+            setDashStats(statsRes.data);
+        } catch (err) {
+            setError("Failed to load approver dashboard.");
+            console.error(err);
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    useEffect(() => { load(); }, [load]);
+
+    async function handleAction(id, action, comment) {
+        try {
+            await api.post(`/reviews/${id}`, { action, comment });
+            setPending((prev) => prev.filter((r) => r.id !== id));
+            load();
+        } catch (err) {
+            alert(err?.response?.data?.error ?? "Action failed.");
+        }
+    }
+
+    const stats = [
+        {
+            label: "Awaiting Sign-off",
+            value: pendingReports.length,
+            icon: "hourglass",
+            color: "amber",
+            trend: "stage 2 queue",
+            trendUp: pendingReports.length === 0,
+        },
+        {
+            label: "Approved",
+            value: dashStats?.approvedReports ?? 0,
+            icon: "approved",
+            color: "emerald",
+            trend: `${dashStats?.approvedThisWeek ?? 0} this week`,
+            trendUp: true,
+        },
+        {
+            label: "Total Reports",
+            value: dashStats?.totalReports ?? allReports.length,
+            icon: "reports",
+            color: "indigo",
+            trend: `${dashStats?.reportsThisMonth ?? 0} this month`,
+            trendUp: true,
+        },
+        {
+            label: "Compliance Rate",
+            value: `${Math.round(dashStats?.complianceRate ?? 0)}%`,
+            icon: "compliance",
+            color: "violet",
+            trend: dashStats?.complianceRateDelta != null
+                ? `${dashStats.complianceRateDelta > 0 ? "+" : ""}${dashStats.complianceRateDelta}% vs last month`
+                : "org-wide",
+            trendUp: (dashStats?.complianceRateDelta ?? 0) >= 0,
+        },
+    ];
+
+    const deptCompliance = (dashStats?.departmentBreakdown ?? []).map((d, i) => ({
+        name: d.name ?? `Dept ${i + 1}`,
+        submitted: d.submitted ?? d.submittedCount ?? 0,
+        total: d.total ?? d.totalCount ?? 1,
+        color: ["indigo", "violet", "sky", "emerald", "amber", "rose"][i % 6],
+    }));
+
+    const complianceRate = Math.round(dashStats?.complianceRate ?? 0);
+    const firstName = user?.full_name?.split(" ")[0] ?? "Approver";
 
     return (
         <div className="min-h-screen bg-[#f8f9fc] text-[#0f1117]">
@@ -59,188 +325,90 @@ export default function ApproverDashboard() {
                 {/* Header */}
                 <div className="flex items-center justify-between mb-8">
                     <div>
-                        <p className="text-sm text-gray-500 mb-1">Final Stage Approvals ✅</p>
-                        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">COO Dashboard</h1>
+                        <p className="text-sm text-gray-500 mb-1">Approvals </p>
+                        <h1 className="text-2xl font-extrabold text-gray-900 tracking-tight">
+                            Hey {firstName} —{" "}
+                            {pendingReports.length === 0
+                                ? "all reports signed off "
+                                : `${pendingReports.length} awaiting your sign-off`}
+                        </h1>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <button className="relative p-2.5 bg-white border border-gray-200 rounded-xl text-gray-500 hover:text-gray-900 transition-colors shadow-sm">
-                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                            </svg>
-                            {remaining > 0 && (
-                                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-rose-500 rounded-full" />
-                            )}
-                        </button>
-                        <div className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 shadow-sm">
-                            Overall Compliance: <span className="text-emerald-600">{overallCompliance}%</span>
-                        </div>
+                    <div className="px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 shadow-sm">
+                        Compliance:{" "}
+                        <span className={complianceRate >= 80 ? "text-emerald-600" : "text-amber-600"}>
+                            {complianceRate}%
+                        </span>
                     </div>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-                    {[
-                        { label: "Awaiting Sign-off", value: remaining, icon: "⏳", color: "text-amber-600" },
-                        { label: "Approved Today", value: Object.values(actionDone).filter(a => a === "Approved").length, icon: "✅", color: "text-emerald-600" },
-                        { label: "Total Reports", value: 248, icon: "📋", color: "text-indigo-600" },
-                        { label: "Compliance Rate", value: `${overallCompliance}%`, icon: "📊", color: "text-violet-600" },
-                    ].map((s) => (
-                        <div key={s.label} className="bg-white border border-gray-100 rounded-2xl p-4 shadow-sm hover:shadow-md transition-all">
-                            <div className="text-xl mb-2">{s.icon}</div>
-                            <div className={`text-2xl font-extrabold mb-0.5 ${s.color}`}>{s.value}</div>
-                            <div className="text-[11px] text-gray-400 font-medium">{s.label}</div>
+                {loading ? (
+                    <div className="flex items-center justify-center h-64 text-gray-400">Loading…</div>
+                ) : error ? (
+                    <div className="text-center py-16">
+                        <p className="text-red-500 mb-3">{error}</p>
+                        <button onClick={load} className="text-sm text-indigo-600 hover:underline">Retry</button>
+                    </div>
+                ) : (
+                    <>
+                        <div className="mb-6">
+                            <StatsGrid stats={stats} cols={4} />
                         </div>
-                    ))}
-                </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                            <div className="lg:col-span-2 flex flex-col gap-6">
+                                <ReviewQueue
+                                    items={pendingReports}
+                                    onAction={handleAction}
+                                    stage={2}
+                                    title="Stage 2 — Final Approval Queue"
+                                />
 
-                    {/* Stage 2 Approval Queue */}
-                    <div className="lg:col-span-2 space-y-4">
-                        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-                                <span className="font-bold text-sm text-gray-800">Stage 2 — Final Approval Queue</span>
-                                {remaining > 0 && (
-                                    <span className="text-xs bg-rose-100 text-rose-700 font-bold px-2.5 py-1 rounded-full">
-                                        {remaining} need your sign-off
-                                    </span>
+                                {allReports.length > 0 && (
+                                    <ReportTable
+                                        reports={allReports.slice(0, 10)}
+                                        showEmployee={true}
+                                        onView={(r) => setViewing({ id: r.id, title: r.title })}
+                                    />
                                 )}
                             </div>
-                            <div>
-                                {pendingApprovals.map((r) => (
-                                    <div key={r.id} className={`border-b border-gray-50 last:border-0 transition-all ${actionDone[r.id] ? "opacity-50" : ""}`}>
-                                        <div className="flex items-center justify-between px-5 py-4 hover:bg-gray-50/50">
-                                            <div className="flex-1 min-w-0 mr-4">
-                                                <div className="flex items-center gap-2 mb-0.5">
-                                                    <span className="text-sm font-semibold text-gray-800">{r.name}</span>
-                                                    <span className="text-[9px] bg-violet-100 text-violet-700 font-bold px-2 py-0.5 rounded-full">Stage 1 ✓</span>
-                                                </div>
-                                                <div className="text-xs text-gray-400">
-                                                    {r.employee} · {r.dept} · Reviewed by {r.reviewer} · {r.passedStage1}
-                                                </div>
+
+                            <div className="flex flex-col gap-6">
+                                <ComplianceBar
+                                    departments={deptCompliance}
+                                    title="Dept. Compliance"
+                                />
+
+                                <div className="bg-gradient-to-br from-indigo-600 to-violet-600 rounded-2xl p-5 shadow-lg shadow-indigo-200">
+                                    <p className="text-indigo-200 text-xs font-semibold mb-1">Overall Status</p>
+                                    <p className="text-white text-3xl font-extrabold mb-1">{complianceRate}%</p>
+                                    <p className="text-indigo-200 text-xs mb-4">Org compliance this period</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                        {[
+                                            { label: "Approved", val: dashStats?.approvedReports ?? 0 },
+                                            { label: "Pending", val: dashStats?.pendingReports ?? 0 },
+                                            { label: "Rejected", val: dashStats?.rejectedReports ?? 0 },
+                                            { label: "In Review", val: pendingReports.length },
+                                        ].map((item) => (
+                                            <div key={item.label} className="bg-white/10 rounded-xl p-2.5 text-center">
+                                                <div className="text-white font-extrabold text-sm">{item.val}</div>
+                                                <div className="text-indigo-200 text-[9px] font-medium">{item.label}</div>
                                             </div>
-                                            {actionDone[r.id] ? (
-                                                <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold ${actionDone[r.id] === "Approved" ? "bg-emerald-100 text-emerald-700" :
-                                                    actionDone[r.id] === "Rejected" ? "bg-red-100 text-red-700" :
-                                                        "bg-amber-100 text-amber-700"
-                                                    }`}>{actionDone[r.id]}</span>
-                                            ) : (
-                                                <button
-                                                    onClick={() => setSelected(selected === r.id ? null : r.id)}
-                                                    className="px-3 py-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-xs font-bold rounded-lg border border-emerald-200 transition-colors flex-shrink-0"
-                                                >
-                                                    Sign Off
-                                                </button>
-                                            )}
-                                        </div>
-
-                                        {/* Inline Approval Panel */}
-                                        {selected === r.id && (
-                                            <div className="px-5 pb-4 bg-emerald-50/40 border-t border-emerald-100">
-                                                <p className="text-xs font-semibold text-gray-700 mb-2 pt-3">Final comments (optional)</p>
-                                                <textarea
-                                                    className="w-full border border-gray-200 rounded-xl p-3 text-xs text-gray-700 resize-none focus:outline-none focus:border-emerald-400 bg-white"
-                                                    rows={2}
-                                                    placeholder="Add a note for the record..."
-                                                    value={comment}
-                                                    onChange={(e) => setComment(e.target.value)}
-                                                />
-                                                <div className="flex gap-2 mt-3">
-                                                    <button
-                                                        onClick={() => handleAction(r.id, "Approved")}
-                                                        className="flex-1 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-xl transition-colors"
-                                                    >
-                                                        ✓ Final Approve
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAction(r.id, "Changes Requested")}
-                                                        className="flex-1 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold rounded-xl transition-colors"
-                                                    >
-                                                        ✏ Request Changes
-                                                    </button>
-                                                    <button
-                                                        onClick={() => handleAction(r.id, "Rejected")}
-                                                        className="flex-1 py-2 bg-rose-500 hover:bg-rose-600 text-white text-xs font-bold rounded-xl transition-colors"
-                                                    >
-                                                        ✕ Reject
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
+                                        ))}
                                     </div>
-                                ))}
+                                </div>
                             </div>
                         </div>
-
-                        {/* All Reports */}
-                        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                                <span className="font-bold text-sm text-gray-800">All Reports Overview</span>
-                            </div>
-                            <div>
-                                {allReports.map((r) => (
-                                    <div key={r.name} className="flex items-center justify-between px-5 py-3 border-b border-gray-50 last:border-0">
-                                        <div>
-                                            <p className="text-sm font-semibold text-gray-800">{r.name}</p>
-                                            <p className="text-xs text-gray-400">{r.dept} · {r.date}</p>
-                                        </div>
-                                        <span className={`text-[10px] px-2.5 py-1 rounded-full font-bold ${statusColor[r.status]}`}>
-                                            {r.status}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Compliance Analytics */}
-                    <div className="flex flex-col gap-6">
-                        <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
-                            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50">
-                                <span className="font-bold text-sm text-gray-800">Dept. Compliance</span>
-                            </div>
-                            <div className="p-5 space-y-4">
-                                {complianceByDept.map((d) => (
-                                    <div key={d.name}>
-                                        <div className="flex justify-between items-center mb-1.5">
-                                            <span className="text-xs font-medium text-gray-700">{d.name}</span>
-                                            <span className={`text-xs font-bold ${d.rate >= 80 ? "text-emerald-600" : d.rate >= 60 ? "text-amber-600" : "text-rose-500"}`}>
-                                                {d.rate}%
-                                            </span>
-                                        </div>
-                                        <div className="w-full bg-gray-100 rounded-full h-2">
-                                            <div
-                                                className={`${d.color} h-2 rounded-full transition-all`}
-                                                style={{ width: `${d.rate}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        {/* Summary Card */}
-                        <div className="bg-gradient-to-br from-indigo-600 to-violet-600 rounded-2xl p-5 shadow-lg shadow-indigo-200">
-                            <p className="text-indigo-200 text-xs font-semibold mb-1">Overall Status</p>
-                            <p className="text-white text-3xl font-extrabold mb-1">{overallCompliance}%</p>
-                            <p className="text-indigo-200 text-xs mb-4">Org compliance this period</p>
-                            <div className="grid grid-cols-2 gap-2">
-                                {[
-                                    { label: "Approved", val: 198, color: "bg-white/20" },
-                                    { label: "Pending", val: 17, color: "bg-white/10" },
-                                    { label: "Rejected", val: 12, color: "bg-white/10" },
-                                    { label: "In Review", val: 21, color: "bg-white/10" },
-                                ].map((item) => (
-                                    <div key={item.label} className={`${item.color} rounded-xl p-2.5 text-center`}>
-                                        <div className="text-white font-extrabold text-sm">{item.val}</div>
-                                        <div className="text-indigo-200 text-[9px] font-medium">{item.label}</div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                    </>
+                )}
             </div>
+
+            {viewing && (
+                <ReportModal
+                    reportId={viewing.id}
+                    title={viewing.title}
+                    onClose={() => setViewing(null)}
+                />
+            )}
         </div>
     );
 }
